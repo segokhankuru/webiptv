@@ -45,8 +45,8 @@ router.post('/register', async (req, res) => {
 
         res.status(201).json({ message: 'User registered successfully', userId: result.lastInsertRowid });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error("Register endpoint database error:", err);
+        res.status(500).json({ error: 'Internal server error', message: err.message, stack: err.stack });
     }
 });
 

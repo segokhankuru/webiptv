@@ -28,8 +28,14 @@ app.use('/api/channels', channelRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/admin', adminRoutes);
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'IPTV Backend is running' });
+app.get('/api/health', async (req, res) => {
+    try {
+        const time = await db.prepare('SELECT NOW()').get();
+        res.json({ status: 'ok', message: 'IPTV Backend is running', dbTime: time });
+    } catch (e) {
+        console.error("Health check database failure:", e);
+        res.status(500).json({ status: 'error', error: e.message, stack: e.stack });
+    }
 });
 
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
