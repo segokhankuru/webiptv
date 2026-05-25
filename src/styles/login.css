@@ -1,0 +1,74 @@
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: var(--bg-color);
+}
+.login-box {
+    background-color: var(--surface-color);
+    padding: 40px;
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    width: 100%;
+    max-width: 480px;
+}
+.login-box h2 {
+    margin-bottom: 10px;
+    color: var(--text-primary);
+    text-align: center;
+}
+.login-box p {
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 30px;
+}
+.input-group {
+    margin-bottom: 20px;
+}
+.input-group input {
+    width: 100%;
+    padding: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+.input-group input:focus {
+    border-color: var(--accent-color);
+}
+.btn {
+    width: 100%;
+    padding: 15px;
+    border-radius: var(--border-radius-md);
+    font-size: 16px;
+    font-weight: 600;
+    transition: background-color var(--transition-fast);
+}
+.btn-primary {
+    background-color: var(--accent-color);
+    color: white;
+}
+.btn-primary:hover {
+    background-color: var(--accent-hover);
+}
+.btn-primary:disabled {
+    background-color: var(--surface-hover);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: var(--surface-hover);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    background-color: var(--accent-color);
+    width: 0%;
+    transition: width 0.2s;
+}

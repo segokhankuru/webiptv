@@ -1,0 +1,270 @@
+.netflix-layout {
+    min-height: 100vh;
+    background-color: var(--bg-color);
+    padding-bottom: 30px;
+}
+
+.netflix-navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 55px;
+    background: var(--navbar-bg);
+    display: flex;
+    align-items: center;
+    padding: 0 4%;
+    z-index: 100;
+    transition: background-color 0.3s;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+.netflix-navbar.scrolled {
+    background-color: var(--navbar-scrolled);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.logo {
+    color: var(--accent-color);
+    font-size: 20px;
+    font-weight: 800;
+    margin-right: 30px;
+    letter-spacing: -1px;
+}
+.logo .badge {
+    font-size: 9px;
+    background: var(--text-primary);
+    color: var(--bg-color);
+    padding: 2px 4px;
+    border-radius: 3px;
+    vertical-align: top;
+    margin-left: 5px;
+}
+
+.nav-links {
+    flex: 1;
+    display: flex;
+    gap: 15px;
+}
+.nav-links a {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+.nav-links a:hover, .nav-links a.active {
+    opacity: 1;
+    font-weight: 600;
+}
+
+.user-profile img {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.hero-section {
+    height: 40vh;
+    min-height: 250px;
+    background-image: url('https://images.unsplash.com/photo-1593784991095-a205069470b6?auto=format&fit=crop&q=80&w=2000');
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 4% 4% 4%;
+}
+.hero-section::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, var(--bg-color) 0%, transparent 80%),
+                linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 50%);
+}
+.hero-content {
+    position: relative;
+    z-index: 10;
+    max-width: 500px;
+}
+.hero-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 6px rgba(0,0,0,0.6);
+    color: #ffffff;
+}
+.hero-desc {
+    font-size: 1rem;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+    color: #e5e5e5;
+}
+
+.categories-container {
+    padding: 0 4%;
+    margin-top: -30px;
+    position: relative;
+    z-index: 20;
+}
+
+.category-row {
+    margin-bottom: 2vw;
+}
+.category-title {
+    font-size: clamp(14px, 1.1vw, 18px);
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text-primary);
+}
+.category-title .count {
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+.category-title a {
+    color: var(--accent-color);
+    font-size: 0.7em;
+    font-weight: 400;
+    margin-left: 10px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.category-row:hover .category-title a {
+    opacity: 1;
+}
+
+.slider-container {
+    position: relative;
+}
+.slider-btn {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 4%;
+    background: var(--slider-btn-bg);
+    color: var(--text-primary);
+    font-size: 2vw;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+}
+.slider-container:hover .slider-btn {
+    opacity: 1;
+}
+.slider-btn:hover {
+    background: var(--slider-btn-hover);
+}
+.slider-btn.left { left: 0; border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.slider-btn.right { right: 0; border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+
+.channels-slider {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    padding: 8px 0;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.channels-slider::-webkit-scrollbar {
+    display: none;
+}
+
+.channel-card {
+    flex: 0 0 calc(100% / 8 - 8px);
+    min-width: 120px;
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
+    position: relative;
+    border: 1px solid transparent;
+}
+.channel-card:hover {
+    transform: scale(1.05);
+    z-index: 2;
+    box-shadow: var(--card-shadow);
+    border-color: var(--border-color);
+}
+
+.card-img-container {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-color: var(--card-img-bg);
+    border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.card-img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 4px;
+}
+
+.play-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--play-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.channel-card:hover .play-overlay {
+    opacity: 1;
+}
+.play-overlay i {
+    font-size: 2.5rem;
+    color: white;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+.res-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 4px;
+    border-radius: 3px;
+    z-index: 2;
+}
+.res-badge.\34 k  { background-color: var(--badge-4k-bg);  color: var(--badge-4k);  border: 1px solid var(--badge-4k); }
+.res-badge.fhd { background-color: var(--badge-fhd-bg); color: var(--badge-fhd); border: 1px solid var(--badge-fhd); }
+.res-badge.hd  { background-color: var(--badge-hd-bg);  color: var(--badge-hd);  border: 1px solid var(--badge-hd); }
+.res-badge.sd  { background-color: var(--badge-sd-bg);  color: var(--badge-sd);  border: 1px solid var(--badge-sd); }
+
+.card-info {
+    padding: 6px 4px;
+}
+.card-info h4 {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 1200px) {
+    .channel-card { flex: 0 0 calc(100% / 6 - 8px); }
+    .category-title { font-size: 16px; }
+}
+@media (max-width: 900px) {
+    .channel-card { flex: 0 0 calc(100% / 5 - 8px); }
+    .hero-title { font-size: 1.8rem; }
+}
+@media (max-width: 600px) {
+    .channel-card { flex: 0 0 calc(100% / 3 - 8px); }
+}

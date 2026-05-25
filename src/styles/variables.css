@@ -1,0 +1,166 @@
+/* Varsayılan: html elemanında data-theme yoksa koyu tema */
+:root {
+    --bg-color: #0f0f11;
+    --bg-secondary: #141414;
+    --surface-color: #1a1a1f;
+    --surface-hover: #2a2a35;
+    --border-color: #2a2a2a;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0b0;
+    --text-muted: #555566;
+    --accent-color: #e50914;
+    --accent-hover: #f40612;
+    --navbar-bg: rgba(0, 0, 0, 0.92);
+    --navbar-scrolled: #141414;
+    --card-bg: #1a1a1f;
+    --card-img-bg: #000000;
+    --card-shadow: 0 10px 20px rgba(0,0,0,0.8);
+    --input-bg: #222228;
+    --input-border: #3a3a3a;
+    --input-focus: #e50914;
+    --play-overlay: rgba(0,0,0,0.5);
+    --slider-btn-bg: rgba(0,0,0,0.5);
+    --slider-btn-hover: rgba(0,0,0,0.85);
+    --badge-4k: #ffd700;
+    --badge-4k-bg: rgba(255,215,0,0.15);
+    --badge-fhd: #a855f7;
+    --badge-fhd-bg: rgba(168,85,247,0.15);
+    --badge-hd: #3b82f6;
+    --badge-hd-bg: rgba(59,130,246,0.15);
+    --badge-sd: #64748b;
+    --badge-sd-bg: rgba(100,116,139,0.15);
+    --navbar-height: 60px;
+    --sidebar-width: 240px;
+    --border-radius-sm: 4px;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.3s ease;
+}
+
+/* Koyu tema (açık seçildiğinde de geçerli olsun diye tekrar yaz) */
+html[data-theme="dark"] {
+    --bg-color: #0f0f11;
+    --bg-secondary: #141414;
+    --surface-color: #1a1a1f;
+    --surface-hover: #2a2a35;
+    --border-color: #2a2a2a;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0b0;
+    --accent-color: #e50914;
+    --accent-hover: #f40612;
+    --navbar-bg: rgba(0,0,0,0.92);
+    --navbar-scrolled: #141414;
+    --card-bg: #1a1a1f;
+    --card-img-bg: #000000;
+    --input-bg: #222228;
+    --slider-btn-bg: rgba(0,0,0,0.5);
+    --slider-btn-hover: rgba(0,0,0,0.85);
+}
+
+/* Açık tema */
+html[data-theme="light"] {
+    --bg-color: #f0f0f5;
+    --bg-secondary: #e5e5ea;
+    --surface-color: #ffffff;
+    --surface-hover: #e8e8ee;
+    --border-color: #d8d8df;
+    --text-primary: #1d1d1f;
+    --text-secondary: #555566;
+    --text-muted: #aaaaaa;
+    --accent-color: #cc0000;
+    --accent-hover: #dd0000;
+    --navbar-bg: rgba(240,240,245,0.92);
+    --navbar-scrolled: #e5e5ea;
+    --card-bg: #ffffff;
+    --card-img-bg: #f0f0f5;
+    --card-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    --input-bg: #ffffff;
+    --input-border: #cccccc;
+    --play-overlay: rgba(0,0,0,0.35);
+    --slider-btn-bg: rgba(220,220,225,0.85);
+    --slider-btn-hover: rgba(200,200,210,0.98);
+    --badge-4k: #b8860b;
+    --badge-4k-bg: rgba(184,134,11,0.12);
+    --badge-fhd: #7c3aed;
+    --badge-fhd-bg: rgba(124,58,237,0.1);
+    --badge-hd: #1d4ed8;
+    --badge-hd-bg: rgba(29,78,216,0.1);
+    --badge-sd: #475569;
+    --badge-sd-bg: rgba(71,85,105,0.1);
+}
+
+/* AMOLED - Saf Siyah */
+html[data-theme="amoled"] {
+    --bg-color: #000000;
+    --bg-secondary: #0a0a0a;
+    --surface-color: #111111;
+    --surface-hover: #1a1a1a;
+    --border-color: #1f1f1f;
+    --text-primary: #ffffff;
+    --text-secondary: #999999;
+    --accent-color: #e50914;
+    --accent-hover: #ff1a1a;
+    --navbar-bg: rgba(0,0,0,0.98);
+    --navbar-scrolled: #000000;
+    --card-bg: #111111;
+    --card-img-bg: #000000;
+    --card-shadow: 0 8px 25px rgba(0,0,0,0.95);
+    --input-bg: #111111;
+    --input-border: #222222;
+    --play-overlay: rgba(0,0,0,0.6);
+    --slider-btn-bg: rgba(0,0,0,0.7);
+    --slider-btn-hover: rgba(0,0,0,0.95);
+}
+
+/* Okyanus - Mavi */
+html[data-theme="ocean"] {
+    --bg-color: #0a0e1a;
+    --bg-secondary: #0f1525;
+    --surface-color: #131d35;
+    --surface-hover: #1c2b4a;
+    --border-color: #1e2f50;
+    --text-primary: #e8f0fe;
+    --text-secondary: #8eadcf;
+    --text-muted: #3d5a80;
+    --accent-color: #3b82f6;
+    --accent-hover: #60a5fa;
+    --navbar-bg: rgba(10,14,26,0.92);
+    --navbar-scrolled: #0f1525;
+    --card-bg: #131d35;
+    --card-img-bg: #0a0e1a;
+    --card-shadow: 0 8px 25px rgba(0,0,50,0.6);
+    --input-bg: #0f1525;
+    --input-border: #1e3a5f;
+    --play-overlay: rgba(0,10,30,0.5);
+    --slider-btn-bg: rgba(0,10,30,0.5);
+    --slider-btn-hover: rgba(0,10,30,0.85);
+    --badge-hd: #60a5fa;
+    --badge-hd-bg: rgba(96,165,250,0.15);
+}
+
+/* Orman - Yeşil */
+html[data-theme="forest"] {
+    --bg-color: #0a110e;
+    --bg-secondary: #0f1a14;
+    --surface-color: #132018;
+    --surface-hover: #1c3025;
+    --border-color: #1e3528;
+    --text-primary: #e8f5e9;
+    --text-secondary: #81c784;
+    --text-muted: #2e7d32;
+    --accent-color: #4caf50;
+    --accent-hover: #66bb6a;
+    --navbar-bg: rgba(10,17,14,0.92);
+    --navbar-scrolled: #0f1a14;
+    --card-bg: #132018;
+    --card-img-bg: #0a110e;
+    --card-shadow: 0 8px 25px rgba(0,30,10,0.6);
+    --input-bg: #0f1a14;
+    --input-border: #1e4028;
+    --play-overlay: rgba(0,15,5,0.5);
+    --slider-btn-bg: rgba(0,15,5,0.5);
+    --slider-btn-hover: rgba(0,15,5,0.85);
+    --badge-hd: #4caf50;
+    --badge-hd-bg: rgba(76,175,80,0.15);
+}
