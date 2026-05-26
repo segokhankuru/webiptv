@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-iptv-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET || 'super-secret-iptv-key-2026';
 
 export const verifyToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];

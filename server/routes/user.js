@@ -119,7 +119,7 @@ router.post('/subscribe', verifyToken, async (req, res) => {
         await db.prepare(`
             UPDATE users 
             SET subscription_type = ?, 
-                subscription_expires_at = CURRENT_TIMESTAMP + (? || ' day')::INTERVAL 
+                subscription_expires_at = CURRENT_TIMESTAMP + make_interval(days => ?::int) 
             WHERE id = ?
         `).run(plan || 'premium', days, req.user.id);
         

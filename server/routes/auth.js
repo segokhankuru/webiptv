@@ -1,15 +1,16 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db from '../db.js';
+import db, { initDb } from '../db.js';
 import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-iptv-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET || 'super-secret-iptv-key-2026';
 
-// Initialize default admin if not exists
+// Initialize default admin if not exists — migration tamamlandıktan sonra çalışır
 const initAdmin = async () => {
     try {
+        await initDb(); // Migration'ın bitmesini bekle
         const admin = await db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
         if (!admin) {
             const hash = bcrypt.hashSync('admin123', 10);
@@ -19,11 +20,10 @@ const initAdmin = async () => {
             console.log('Default admin created: admin / admin123');
         }
     } catch (e) {
-        console.warn('Admin check/initialization deferred until DB connection is active:', e.message);
+        console.warn('Admin check/initialization deferred:', e.message);
     }
 };
-// We run it with a slight delay to ensure pool is initialized
-setTimeout(initAdmin, 1000);
+initAdmin();
 
 router.post('/register', async (req, res) => {
     try {
