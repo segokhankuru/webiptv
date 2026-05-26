@@ -1,4 +1,5 @@
 import { apiClient } from '../services/api-client.js';
+import { channelDB } from '../services/channel-db.js';
 
 export function renderSearch() {
     let searchTimeout = null;
@@ -39,7 +40,13 @@ export function renderSearch() {
             
             searchTimeout = setTimeout(async () => {
                 try {
-                    const results = await apiClient.request(`/channels/search?q=${encodeURIComponent(query)}&limit=50`);
+                    const sourceId = localStorage.getItem('iptv_active_source_id');
+                    if (!sourceId) {
+                        resultsContainer.innerHTML = '<p style="color: #ffc107; text-align: center; font-size: 18px; margin-top: 40px;">Lütfen önce bir profil seçin.</p>';
+                        return;
+                    }
+                    
+                    const results = await channelDB.searchChannels(sourceId, query, 50);
                     if (results.length === 0) {
                         resultsContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; font-size: 18px; margin-top: 40px;">Maalesef sonuç bulunamadı.</p>';
                         return;
@@ -48,7 +55,7 @@ export function renderSearch() {
                     let html = '';
                     for(const ch of results) {
                         const fallbackChar = ch.name.substring(0,2).toUpperCase();
-                        const logoUrl = ch.logo_url || `https://placehold.co/120x80/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
+                        const logoUrl = ch.logo || `https://placehold.co/120x80/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
                         
                         let resBadge = '';
                         if (ch.resolution === '4K') resBadge = `<span style="font-size: 10px; background: var(--badge-4k-bg); color: var(--badge-4k); padding: 2px 5px; border-radius: 3px; margin-left: 10px;">4K</span>`;
@@ -68,7 +75,7 @@ export function renderSearch() {
                     }
                     resultsContainer.innerHTML = html;
                 } catch(err) {
-                    resultsContainer.innerHTML = '<p style="color: red; text-align: center; margin-top: 40px;">Arama sırasında sunucu hatası oluştu.</p>';
+                    resultsContainer.innerHTML = '<p style="color: red; text-align: center; margin-top: 40px;">Arama sırasında hata oluştu.</p>';
                 }
             }, 300);
         });

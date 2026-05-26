@@ -1,4 +1,5 @@
 import { apiClient } from '../services/api-client.js';
+import { channelDB } from '../services/channel-db.js';
 
 export async function renderHome() {
     const container = document.getElementById('app');
@@ -63,9 +64,20 @@ export async function renderHome() {
     });
 
     try {
-        const categories = await apiClient.request('/channels/categories');
+        const activeId = localStorage.getItem('iptv_active_source_id');
+        if (!activeId) {
+            document.getElementById('categories-container').innerHTML = `<p style="color:#ffc107; text-align:center; padding: 50px;">Lütfen önce bir profil seçin. <a href="#/profiles" style="color:#E50914;">Profil Seç</a></p>`;
+            return;
+        }
+
+        const categories = await channelDB.getCategories(activeId);
         const catContainer = document.getElementById('categories-container');
         catContainer.innerHTML = ''; // clear loading
+
+        if (categories.length === 0) {
+            catContainer.innerHTML = '<p style="color: var(--text-secondary); text-align:center; padding: 50px;">Bu profilde henüz kanal bulunamadı. Profili seçerek senkronize edin.</p>';
+            return;
+        }
 
         for (const cat of categories) {
             if (cat.count > 0) {
@@ -78,7 +90,7 @@ export async function renderHome() {
                                 ${cat.category} <span class="count">(${cat.count})</span>
                             </a>
                             <a href="#/category/${encodeURIComponent(cat.category)}" style="font-size: 13px; color: var(--accent-color); text-decoration: none; font-weight: 600; padding: 4px 8px; border: 1px solid rgba(229,9,20,0.3); border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='var(--accent-color)'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='var(--accent-color)'">
-                                Tümünü Gör ❯
+                                Tümünü Gör ❱
                             </a>
                         </h3>
                         <div class="slider-container">
@@ -93,8 +105,8 @@ export async function renderHome() {
                 `;
                 catContainer.insertAdjacentHTML('beforeend', rowHtml);
                 
-                // Fetch channels for this category
-                loadCategoryChannels(cat.category, rowId);
+                // Fetch channels for this category from IndexedDB
+                loadCategoryChannels(cat.category, rowId, activeId);
             }
         }
 
@@ -103,10 +115,10 @@ export async function renderHome() {
     }
 }
 
-async function loadCategoryChannels(categoryName, rowId) {
+async function loadCategoryChannels(categoryName, rowId, sourceId) {
     try {
-        // Ana sayfada kalabalık olmaması için her kategoriden sadece 10 kanal çekeceğiz
-        const response = await apiClient.request(`/channels?category=${encodeURIComponent(categoryName)}&limit=10`);
+        // IndexedDB'den kategori kanallarını çek (ana sayfa için 10 kanal yeterli)
+        const response = await channelDB.getChannelsByCategory(sourceId, categoryName, 1, 10);
         const slider = document.getElementById(rowId);
         
         if (!response.data || response.data.length === 0) {
@@ -122,12 +134,12 @@ async function loadCategoryChannels(categoryName, rowId) {
                 if (ch.resolution === '4K') badgeClass += ' 4k';
                 else if (ch.resolution === 'FHD') badgeClass += ' fhd';
                 else if (ch.resolution === 'HD') badgeClass += ' hd';
-                else badgeClass += ' sd'; // Fallback style for SD
+                else badgeClass += ' sd';
                 resBadge = `<span class="${badgeClass}">${ch.resolution}</span>`;
             }
             
             const fallbackChar = ch.name.substring(0, 2).toUpperCase();
-            const logoUrl = ch.logo_url || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
+            const logoUrl = ch.logo || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
 
             html += `
                 <div class="channel-card" id="card-${ch.id}" onclick="sessionStorage.setItem('last_played_channel', '${ch.id}'); sessionStorage.setItem('last_played_row', '${rowId}'); window.location.hash='#/player/${ch.id}'">

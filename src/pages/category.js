@@ -1,4 +1,5 @@
 import { apiClient } from '../services/api-client.js';
+import { channelDB } from '../services/channel-db.js';
 
 export function renderCategory(categoryName) {
     const container = document.getElementById('app');
@@ -53,8 +54,14 @@ export function renderCategory(categoryName) {
         if (isFetching || !hasMore) return;
         isFetching = true;
         
+        const sourceId = localStorage.getItem('iptv_active_source_id');
+        if (!sourceId) {
+            grid.innerHTML = '<p style="color:#ffc107; width: 100%; text-align: center; padding: 50px;">Aktif profil seçilmedi.</p>';
+            return;
+        }
+
         try {
-            const res = await apiClient.request(`/channels?category=${categoryName}&page=${page}&limit=50`);
+            const res = await channelDB.getChannelsByCategory(sourceId, decodedName, page, 50);
             
             document.getElementById('initial-loading')?.remove();
             
@@ -79,7 +86,7 @@ export function renderCategory(categoryName) {
                 }
                 
                 const fallbackChar = ch.name.substring(0, 2).toUpperCase();
-                const logoUrl = ch.logo_url || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
+                const logoUrl = ch.logo || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
 
                 html += `
                     <div class="channel-card" style="margin-bottom: 15px;" onclick="window.location.hash='#/player/${ch.id}'">

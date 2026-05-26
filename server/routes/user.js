@@ -49,18 +49,14 @@ router.put('/watch/:id', verifyToken, async (req, res) => {
 // Favorites
 router.get('/favorites', verifyToken, async (req, res) => {
     try {
-        const sourceId = req.headers['x-active-source-id'];
-        if (!sourceId) {
-            return res.status(400).json({ error: 'Active source profile not selected' });
-        }
-        
+        // Favoriler artık kendi verilerini tutuyor (channel_name, channel_logo, stream_url)
+        // channels tablosuna JOIN gerekmez çünkü kanal verileri artık client-side IndexedDB'de
         const rows = await db.prepare(`
-            SELECT c.*, f.id as fav_id 
-            FROM favorites f 
-            JOIN channels c ON f.stream_url = c.stream_url 
-            WHERE f.user_id = ? AND c.source_id = ?
-            ORDER BY f.added_at DESC
-        `).all(req.user.id, sourceId);
+            SELECT id, channel_id, channel_name as name, channel_logo as logo_url, stream_url, added_at
+            FROM favorites 
+            WHERE user_id = ?
+            ORDER BY added_at DESC
+        `).all(req.user.id);
         res.json(rows);
     } catch (err) {
         console.error(err);

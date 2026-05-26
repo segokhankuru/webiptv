@@ -78,10 +78,10 @@ export const apiClient = {
         return await response.text();
     },
     
-    async syncChannels(payload) {
-        return this.request('/channels/sync', {
-            method: 'POST',
-            body: JSON.stringify(payload)
+    async updateSourceChannelCount(sourceId, channelCount) {
+        return this.request('/channels/sync-meta', {
+            method: 'PATCH',
+            body: JSON.stringify({ sourceId, channelCount })
         });
     },
     

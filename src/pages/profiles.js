@@ -1,4 +1,5 @@
 import { apiClient } from '../services/api-client.js';
+import { channelDB } from '../services/channel-db.js';
 
 export async function renderProfiles() {
     const container = document.getElementById('app');
@@ -211,10 +212,13 @@ export async function renderProfiles() {
             return;
         }
         
-        const confirmResult = confirm(`"${profile.name}" profilini silmek istediğinize emin misiniz?\n\nBu profile ait tüm kanallar veritabanından kalıcı olarak temizlenecektir!`);
+        const confirmResult = confirm(`"${profile.name}" profilini silmek istediğinize emin misiniz?\n\nBu profile ait tüm kanallar cihazınızdan kalıcı olarak temizlenecektir!`);
         if (!confirmResult) return;
 
         try {
+            // Önce IndexedDB'den kanalları temizle
+            await channelDB.clearChannels(profile.id);
+            // Sonra sunucudan profili sil
             await apiClient.deleteSource(profile.id);
             // If the deleted profile was active, clear active profile
             if (localStorage.getItem('iptv_active_source_id') == profile.id) {
@@ -229,13 +233,16 @@ export async function renderProfiles() {
 
     // Select Profile Flow
     async function selectProfile(profile) {
-        if (profile.channel_count > 0) {
-            // Already synced, activate directly
+        // IndexedDB'de kanal var mı kontrol et
+        const localCount = await channelDB.getChannelCount(profile.id);
+        
+        if (localCount > 0) {
+            // Kanallar zaten cihazda kayıtlı, direkt aç
             localStorage.setItem('iptv_active_source_id', profile.id);
             apiClient.store.activeSource = profile;
             window.location.hash = '#/home';
         } else {
-            // Need to synchronize for the first time
+            // İlk kez açılıyor veya temizlenmiş — senkronizasyon gerekli
             startSync(profile);
         }
     }
@@ -261,26 +268,39 @@ export async function renderProfiles() {
             
             worker.onmessage = async (e) => {
                 if (e.data.type === 'progress') {
-                    // map progress 30% -> 90%
-                    const mappedProgress = Math.floor(30 + (e.data.percent * 0.6));
+                    // map progress 30% -> 70%
+                    const mappedProgress = Math.floor(30 + (e.data.percent * 0.4));
                     syncProgressFill.style.width = `${mappedProgress}%`;
                     syncPercentText.innerText = `%${mappedProgress}`;
                     syncStatusText.innerText = `%${e.data.percent} parse edildi...`;
                 } else if (e.data.type === 'done') {
-                    syncStatusText.innerText = "Sunucuya kaydediliyor... (Lütfen bekleyin)";
-                    syncProgressFill.style.width = '95%';
-                    syncPercentText.innerText = '%95';
+                    syncStatusText.innerText = "Cihaza kaydediliyor...";
+                    syncProgressFill.style.width = '75%';
+                    syncPercentText.innerText = '%75';
                     
                     try {
-                        await apiClient.syncChannels({
-                            sourceId: profile.id,
-                            m3u_url: profile.m3u_url,
-                            channels: e.data.channels
+                        // IndexedDB'ye batch kaydet
+                        const channels = e.data.channels;
+                        await channelDB.saveChannels(profile.id, channels, (percent) => {
+                            const mappedSave = Math.floor(75 + (percent * 0.2));
+                            syncProgressFill.style.width = `${mappedSave}%`;
+                            syncPercentText.innerText = `%${mappedSave}`;
                         });
+                        
+                        // Sunucuya sadece kanal sayısını bildir
+                        syncStatusText.innerText = "Profil güncelleniyor...";
+                        syncProgressFill.style.width = '97%';
+                        syncPercentText.innerText = '%97';
+                        
+                        try {
+                            await apiClient.updateSourceChannelCount(profile.id, channels.length);
+                        } catch (metaErr) {
+                            console.warn('Sunucu kanal sayısı güncellenemedi (önemli değil):', metaErr);
+                        }
                         
                         syncProgressFill.style.width = '100%';
                         syncPercentText.innerText = '%100';
-                        syncStatusText.innerText = "Tamamlandı!";
+                        syncStatusText.innerText = "Tamamlandı! ✓";
                         
                         setTimeout(() => {
                             localStorage.setItem('iptv_active_source_id', profile.id);
@@ -290,7 +310,7 @@ export async function renderProfiles() {
                         }, 500);
                         
                     } catch(err) {
-                        alert("Veritabanı senkronizasyon hatası: " + err.message);
+                        alert("Cihaz kayıt hatası: " + err.message);
                         syncModal.style.display = 'none';
                     }
                 } else if (e.data.type === 'error') {

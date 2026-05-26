@@ -1,4 +1,5 @@
 import { apiClient } from '../services/api-client.js';
+import { channelDB } from '../services/channel-db.js';
 import Hls from 'hls.js';
 
 export async function renderPlayer(channelId) {
@@ -126,58 +127,62 @@ export async function renderPlayer(channelId) {
     }
 
     try {
-        const channel = await apiClient.request(`/channels/${channelId}`);
+        const channel = await channelDB.getChannel(channelId);
+        if (!channel) throw new Error('Kanal bulunamadı');
         const fallbackChar = channel.name.substring(0, 2).toUpperCase();
         
         document.getElementById('channel-name').innerText = channel.name;
         document.getElementById('channel-category').innerText = channel.category;
-        document.getElementById('channel-logo').src = channel.logo_url || `https://placehold.co/50x50/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
+        document.getElementById('channel-logo').src = channel.logo || `https://placehold.co/50x50/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
         document.getElementById('resolution-display').innerText = 'Bağlanıyor...';
         
-        // Load related channels (Full Category + Search)
-        apiClient.request(`/channels?category=${encodeURIComponent(channel.category)}&limit=10000`).then(res => {
-            if (res.data) {
-                const allChannels = res.data.filter(c => c.id != channelId);
-                const relatedContainer = document.getElementById('related-channels');
-                const searchInput = document.getElementById('related-search');
+        // Load related channels from IndexedDB
+        const sourceId = localStorage.getItem('iptv_active_source_id');
+        if (sourceId) {
+            channelDB.getChannelsByCategory(sourceId, channel.category, 1, 10000).then(res => {
+                if (res.data) {
+                    const allChannels = res.data.filter(c => c.id != channelId);
+                    const relatedContainer = document.getElementById('related-channels');
+                    const searchInput = document.getElementById('related-search');
 
-                const renderRelated = (list) => {
-                    let rHtml = '';
-                    const displayList = list.slice(0, 100); // İlk 100 kaydı render et
-                    for (const rc of displayList) {
-                        const rLogo = rc.logo_url || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(rc.name.substring(0,2).toUpperCase())}`;
-                        rHtml += `
-                            <div onclick="window.location.hash='#/player/${rc.id}'" style="display: flex; gap: 10px; cursor: pointer; transition: background 0.2s; padding: 5px; border-radius: 8px;" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
-                                <div style="width: 140px; aspect-ratio: 16/9; background: #000; border-radius: 6px; overflow: hidden; position: relative; flex-shrink: 0;">
-                                    <img src="${rLogo}" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=TV'">
-                                    <span style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.8); color: white; font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: bold;">${rc.resolution || 'SD'}</span>
+                    const renderRelated = (list) => {
+                        let rHtml = '';
+                        const displayList = list.slice(0, 100);
+                        for (const rc of displayList) {
+                            const rLogo = rc.logo || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(rc.name.substring(0,2).toUpperCase())}`;
+                            rHtml += `
+                                <div onclick="window.location.hash='#/player/${rc.id}'" style="display: flex; gap: 10px; cursor: pointer; transition: background 0.2s; padding: 5px; border-radius: 8px;" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
+                                    <div style="width: 140px; aspect-ratio: 16/9; background: #000; border-radius: 6px; overflow: hidden; position: relative; flex-shrink: 0;">
+                                        <img src="${rLogo}" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=TV'">
+                                        <span style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.8); color: white; font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: bold;">${rc.resolution || 'SD'}</span>
+                                    </div>
+                                    <div style="flex: 1; padding-top: 2px; min-width: 0;">
+                                        <h4 style="color: white; margin: 0 0 5px 0; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${rc.name}</h4>
+                                        <p style="color: var(--text-secondary); margin: 0; font-size: 11px;">${rc.category}</p>
+                                    </div>
                                 </div>
-                                <div style="flex: 1; padding-top: 2px; min-width: 0;">
-                                    <h4 style="color: white; margin: 0 0 5px 0; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${rc.name}</h4>
-                                    <p style="color: var(--text-secondary); margin: 0; font-size: 11px;">${rc.category}</p>
-                                </div>
-                            </div>
-                        `;
-                    }
-                    if (list.length > 100) {
-                        rHtml += `<p style="color:gray; font-size:12px; text-align:center; margin-top:10px;">+ ${list.length - 100} kanal daha (arama yapın)</p>`;
-                    }
-                    relatedContainer.innerHTML = rHtml || '<p style="color:gray; font-size: 14px; text-align:center;">Sonuç bulunamadı</p>';
-                };
+                            `;
+                        }
+                        if (list.length > 100) {
+                            rHtml += `<p style="color:gray; font-size:12px; text-align:center; margin-top:10px;">+ ${list.length - 100} kanal daha (arama yapın)</p>`;
+                        }
+                        relatedContainer.innerHTML = rHtml || '<p style="color:gray; font-size: 14px; text-align:center;">Sonuç bulunamadı</p>';
+                    };
 
-                renderRelated(allChannels);
+                    renderRelated(allChannels);
 
-                searchInput.addEventListener('input', (e) => {
-                    const term = e.target.value.toLowerCase();
-                    if (!term) {
-                        renderRelated(allChannels);
-                        return;
-                    }
-                    const filtered = allChannels.filter(c => c.name.toLowerCase().includes(term));
-                    renderRelated(filtered);
-                });
-            }
-        });
+                    searchInput.addEventListener('input', (e) => {
+                        const term = e.target.value.toLowerCase();
+                        if (!term) {
+                            renderRelated(allChannels);
+                            return;
+                        }
+                        const filtered = allChannels.filter(c => c.name.toLowerCase().includes(term));
+                        renderRelated(filtered);
+                    });
+                }
+            });
+        }
 
         // Setup Favorites Logic
         const favBtn = document.getElementById('fav-btn');
