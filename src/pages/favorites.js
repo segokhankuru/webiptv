@@ -64,7 +64,7 @@ export async function renderFavorites() {
             const logoUrl = ch.logo_url || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
 
             html += `
-                <div class="channel-card" style="margin-bottom: 10px;" onclick="window.location.hash='#/player/${ch.id}'">
+                <div class="channel-card" style="margin-bottom: 10px;" onclick="window.location.hash='#/player/${ch.channel_id}'">
                     <div class="card-img-container">
                         <img src="${logoUrl}" alt="${ch.name}" loading="lazy" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}'">
                         ${resBadge}

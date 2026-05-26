@@ -192,9 +192,9 @@ export async function renderPlayer(channelId) {
         let favId = null;
         
         apiClient.request('/user/favorites').then(favs => {
-            const favRecord = favs.find(f => f.stream_url === channel.stream_url);
+            const favRecord = favs.find(f => f.stream_url === channel.streamUrl);
             isFav = !!favRecord;
-            favId = favRecord ? favRecord.fav_id : null;
+            favId = favRecord ? favRecord.id : null;
             
             favIcon.innerText = isFav ? '❤️' : '🤍';
             favText.innerText = isFav ? 'Favorilerden Çıkar' : 'Favoriye Ekle';
@@ -214,8 +214,8 @@ export async function renderPlayer(channelId) {
                             body: JSON.stringify({ 
                                 channel_id: channel.id,
                                 channel_name: channel.name,
-                                channel_logo: channel.logo_url,
-                                stream_url: channel.stream_url
+                                channel_logo: channel.logo,
+                                stream_url: channel.streamUrl
                             })
                         });
                         isFav = true;
@@ -384,7 +384,7 @@ export async function renderPlayer(channelId) {
         let hls = null;
         if (Hls.isSupported()) {
             hls = new Hls({ maxBufferLength: 30, enableWorker: true });
-            hls.loadSource(channel.stream_url);
+            hls.loadSource(channel.streamUrl);
             hls.attachMedia(video);
             
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
@@ -419,7 +419,7 @@ export async function renderPlayer(channelId) {
             });
             
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = channel.stream_url;
+            video.src = channel.streamUrl;
             video.addEventListener('loadedmetadata', () => video.play());
         }
 
