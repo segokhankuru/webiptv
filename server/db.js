@@ -13,6 +13,10 @@ if (!connectionString) {
     console.error("CRITICAL: DATABASE_URL or POSTGRES_URL environment variable is missing! DB operations will fail.");
 }
 
+// Node.js 24.x Supabase'in SSL sertifikasını reddediyor (SELF_SIGNED_CERT_IN_CHAIN).
+// Bu ayar, TLS sertifika doğrulamasını devre dışı bırakır.
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const pool = connectionString ? new Pool({
     connectionString,
     ssl: { rejectUnauthorized: false },
