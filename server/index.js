@@ -1,14 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import db from './db.js'; // Ensure DB is initialized
 
-// dotenv sadece lokal geliştirme ortamında gerekli
-if (!process.env.VERCEL) {
-    const dotenv = await import('dotenv');
-    dotenv.config();
-}
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

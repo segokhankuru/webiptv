@@ -1,10 +1,8 @@
 import pg from 'pg';
+import dotenv from 'dotenv';
 
-// dotenv sadece lokal geliştirmede çalışır; Vercel'de env var'lar Dashboard'dan gelir
-if (!process.env.VERCEL) {
-    const dotenv = await import('dotenv');
-    dotenv.config();
-}
+// Lokal ortamda .env dosyasını yükler, Vercel'de .env olmadığı için sessizce geçer
+dotenv.config();
 
 const { Pool } = pg;
 
