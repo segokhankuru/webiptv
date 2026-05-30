@@ -558,7 +558,7 @@ export async function renderPlayer(channelId) {
                         return;
                     }
                     const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/matroska-subtitles@1.1.2/dist/matroska-subtitles.min.js';
+                    script.src = '/matroska-subtitles.min.js';
                     script.onload = () => resolve(window.MatroskaSubtitles);
                     script.onerror = () => reject(new Error('Altyazı kütüphanesi yüklenemedi.'));
                     document.head.appendChild(script);
