@@ -565,7 +565,7 @@ export async function renderPlayer(channelId) {
                         script.onerror = () => {
                             script.remove();
                             if (fallbackUrl) {
-                                console.warn(`Altyazı kütüphanesi ${url} üzerinden yüklenemedi, CDN deneniyor...`);
+                                console.warn(`Altyazı kütüphanesi ${url} üzerinden yüklenemedi, fallback deneniyor...`);
                                 tryLoad(fallbackUrl, null);
                             } else {
                                 reject(new Error('Altyazı kütüphanesi yüklenemedi.'));
@@ -574,8 +574,12 @@ export async function renderPlayer(channelId) {
                         document.head.appendChild(script);
                     };
 
-                    // Önce yerel yolu dene (Tracking Prevention bypass), 404 olursa CDN'e geç
-                    tryLoad('/matroska-subtitles.min.js', 'https://unpkg.com/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
+                    // Tracking Prevention bypass: Script'i kendi proxy endpoint'imiz üzerinden yükle!
+                    // Böylece tarayıcı bunu harici domain olarak algılamaz ve bloklamaz. Vercel'de de 404 vermez.
+                    const proxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://unpkg.com/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
+                    const fallbackProxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://cdn.jsdelivr.net/npm/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
+
+                    tryLoad(proxyUrl, fallbackProxyUrl);
                 });
             };
 
