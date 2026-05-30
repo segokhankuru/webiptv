@@ -424,13 +424,38 @@ export async function renderPlayer(channelId) {
             video.src = playUrl;
 
             // ── Xtream API Entegrasyonu (Gelişmiş Otomatik Altyazı Arama) ──
-            const srtToVtt = (srtText) => {
-                let vtt = "WEBVTT\n\n";
-                let text = srtText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                const regex = /(\d{2}:\d{2}:\d{2}),(\d{3})/g;
-                text = text.replace(regex, '$1.$2');
-                vtt += text;
-                return vtt;
+            const parseSubtitlesText = (subText) => {
+                const cues = [];
+                const cleanText = subText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                const blocks = cleanText.split('\n\n');
+                const timeRegex = /(\d{2}):(\d{2}):(\d{2})[.,](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[.,](\d{3})/;
+                
+                for (const block of blocks) {
+                    const lines = block.split('\n');
+                    let timeMatch = null;
+                    let textLines = [];
+                    
+                    for (const line of lines) {
+                        const match = line.match(timeRegex);
+                        if (match) {
+                            timeMatch = match;
+                        } else if (timeMatch && line.trim()) {
+                            textLines.push(line.trim());
+                        }
+                    }
+                    
+                    if (timeMatch && textLines.length > 0) {
+                        const startSec = parseInt(timeMatch[1]) * 3600 + parseInt(timeMatch[2]) * 60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4]) / 1000;
+                        const endSec = parseInt(timeMatch[5]) * 3600 + parseInt(timeMatch[6]) * 60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8]) / 1000;
+                        
+                        cues.push({
+                            start: startSec,
+                            end: endSec,
+                            text: textLines.join('<br>')
+                        });
+                    }
+                }
+                return cues;
             };
 
             const parseXtreamUrl = (url) => {
@@ -486,8 +511,12 @@ export async function renderPlayer(channelId) {
 
                         subtitleSelect.onchange = async (e) => {
                             const idx = parseInt(e.target.value);
-                            const existingTracks = video.querySelectorAll('track.dynamic-sub');
-                            existingTracks.forEach(t => t.remove());
+                            
+                            // Mevcut altyazıları temizle
+                            subtitleCues = [];
+                            activeTrackNumber = -1;
+                            subtitleOverlay.style.display = 'none';
+                            subtitleOverlay.innerHTML = '';
 
                             if (idx === -1) return;
 
@@ -496,25 +525,20 @@ export async function renderPlayer(channelId) {
                             
                             try {
                                 const subResponse = await fetch(subUrl);
-                                let subText = await subResponse.text();
+                                const subText = await subResponse.text();
                                 
-                                if (selectedSub.extension === 'srt' || !subText.startsWith('WEBVTT')) {
-                                    subText = srtToVtt(subText);
-                                }
+                                // Altyazıyı parse et ve cues'ları kaydet
+                                const parsedCues = parseSubtitlesText(subText);
                                 
-                                const blob = new Blob([subText], { type: 'text/vtt' });
-                                const blobUrl = URL.createObjectURL(blob);
+                                subtitleCues = parsedCues.map(c => ({
+                                    trackNumber: 999, // Xtream altyazı track no
+                                    start: c.start,
+                                    end: c.end,
+                                    text: c.text
+                                }));
                                 
-                                const track = document.createElement('track');
-                                track.className = 'dynamic-sub';
-                                track.src = blobUrl;
-                                track.kind = 'subtitles';
-                                track.srclang = selectedSub.language.substring(0, 2).toLowerCase();
-                                track.label = selectedSub.language;
-                                track.default = true;
-                                
-                                video.appendChild(track);
-                                track.track.mode = 'showing';
+                                activeTrackNumber = 999;
+                                showToast(`${selectedSub.language} altyazısı yüklendi`);
                             } catch (err) {
                                 console.error("Altyazı yüklenemedi:", err);
                                 showToast("Altyazı yüklenemedi");
