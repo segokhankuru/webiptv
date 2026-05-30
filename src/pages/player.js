@@ -411,12 +411,66 @@ export async function renderPlayer(channelId) {
         if (isDirectVideo || (!isHls && !Hls.isSupported())) {
             // Native video player — MKV, MP4 ve diğer doğrudan dosyalar
             video.src = playUrl;
+
             video.addEventListener('loadedmetadata', () => {
                 video.play().catch(() => {
                     playPauseBtn.innerHTML = icons.play;
                 });
+
+                // ── Ses Track'leri ──────────────────────────────────────────
+                // video.audioTracks: Chrome/Edge destekler, Firefox kısmen destekler
+                const aTracks = video.audioTracks;
+                if (aTracks && aTracks.length > 1) {
+                    audioContainer.style.display = 'block';
+                    settingsBtn.style.display = 'flex';
+
+                    audioSelect.innerHTML = Array.from(aTracks).map((t, i) =>
+                        `<option value="${i}">${t.label || t.language || 'Ses ' + (i + 1)}</option>`
+                    ).join('');
+
+                    audioSelect.addEventListener('change', (e) => {
+                        const idx = parseInt(e.target.value);
+                        Array.from(aTracks).forEach((t, i) => { t.enabled = (i === idx); });
+                    });
+                }
+
+                // ── Altyazı Track'leri ─────────────────────────────────────
+                // video.textTracks: MP4/WebM içine gömülü WebVTT/TTML track'lerini gösterir.
+                // Not: MKV container içine gömülü SRT/ASS tarayıcılar tarafından OKUNABİLİR
+                // DEĞİLDİR — bu tarayıcının kısıtlamasıdır, kodla çözülemez.
+                const tTracks = video.textTracks;
+
+                const populateSubtitles = () => {
+                    const validTracks = Array.from(tTracks).filter(t => t.kind === 'subtitles' || t.kind === 'captions');
+                    if (validTracks.length > 0) {
+                        subtitleContainer.style.display = 'block';
+                        settingsBtn.style.display = 'flex';
+
+                        subtitleSelect.innerHTML = '<option value="-1">Kapalı</option>' +
+                            validTracks.map((t, i) =>
+                                `<option value="${i}">${t.label || t.language || 'Altyazı ' + (i + 1)}</option>`
+                            ).join('');
+
+                        // Başlangıçta hepsini kapat
+                        validTracks.forEach(t => { t.mode = 'hidden'; });
+
+                        subtitleSelect.addEventListener('change', (e) => {
+                            const idx = parseInt(e.target.value);
+                            validTracks.forEach((t, i) => {
+                                t.mode = (i === idx) ? 'showing' : 'hidden';
+                            });
+                        });
+                    }
+                };
+
+                // Track'ler loadedmetadata anında hazır olmayabilir — addtrack dinle
+                if (tTracks.length > 0) {
+                    populateSubtitles();
+                }
+                tTracks.addEventListener('addtrack', populateSubtitles);
             });
-            video.addEventListener('error', (e) => {
+
+            video.addEventListener('error', () => {
                 const codes = { 1: 'Kullanıcı iptal etti', 2: 'Ağ hatası', 3: 'Decode hatası', 4: 'Desteklenmeyen format' };
                 const msg = codes[video.error?.code] || 'Bilinmeyen hata';
                 showToast(`Video yüklenemedi: ${msg}`);
