@@ -562,9 +562,11 @@ export async function renderPlayer(channelId) {
                 const tryFetchAndEval = async (url) => {
                     const response = await fetch(url);
                     if (!response.ok) throw new Error(`Status ${response.status}`);
-                    const codeText = await response.text();
+                    let codeText = await response.text();
                     
-                    // Kodu global scope'ta çalıştır (script enjeksiyonu engellerini bypass eder)
+                    // Kütüphane new Function local scope'unda çalıştığı için global window nesnesine atama yapıyoruz!
+                    codeText += "\nif (typeof MatroskaSubtitles !== 'undefined') { window.MatroskaSubtitles = MatroskaSubtitles; }";
+                    
                     (new Function(codeText))();
                     
                     if (!window.MatroskaSubtitles) {
