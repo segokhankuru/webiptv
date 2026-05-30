@@ -17,9 +17,7 @@ function mapCategoryPrefix(prefix) {
 
 function parseM3u(text) {
     const channels = [];
-    // Split on any line ending (
-, 
-, or )
+    // Split on any line ending (CRLF, LF, or CR)
     const lines = text.split(/\r?\n|\r/);
     let currentInfo = null;
 
