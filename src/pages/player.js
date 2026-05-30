@@ -557,11 +557,25 @@ export async function renderPlayer(channelId) {
                         resolve(window.MatroskaSubtitles);
                         return;
                     }
-                    const script = document.createElement('script');
-                    script.src = '/matroska-subtitles.min.js';
-                    script.onload = () => resolve(window.MatroskaSubtitles);
-                    script.onerror = () => reject(new Error('Altyazı kütüphanesi yüklenemedi.'));
-                    document.head.appendChild(script);
+                    
+                    const tryLoad = (url, fallbackUrl) => {
+                        const script = document.createElement('script');
+                        script.src = url;
+                        script.onload = () => resolve(window.MatroskaSubtitles);
+                        script.onerror = () => {
+                            script.remove();
+                            if (fallbackUrl) {
+                                console.warn(`Altyazı kütüphanesi ${url} üzerinden yüklenemedi, CDN deneniyor...`);
+                                tryLoad(fallbackUrl, null);
+                            } else {
+                                reject(new Error('Altyazı kütüphanesi yüklenemedi.'));
+                            }
+                        };
+                        document.head.appendChild(script);
+                    };
+
+                    // Önce yerel yolu dene (Tracking Prevention bypass), 404 olursa CDN'e geç
+                    tryLoad('/matroska-subtitles.min.js', 'https://unpkg.com/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
                 });
             };
 
