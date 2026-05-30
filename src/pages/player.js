@@ -160,7 +160,7 @@ export async function renderPlayer(channelId) {
                         let rHtml = '';
                         const displayList = list.slice(0, 100);
                         for (const rc of displayList) {
-                            const rLogo = proxyLogoUrl(rc.logo) || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(rc.name.substring(0,2).toUpperCase())}`;,2).toUpperCase())}`;
+                            const rLogo = proxyLogoUrl(rc.logo) || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(rc.name.substring(0,2).toUpperCase())}`;
                             rHtml += `
                                 <div onclick="window.location.hash='#/player/${rc.id}'" style="display: flex; gap: 10px; cursor: pointer; transition: background 0.2s; padding: 5px; border-radius: 8px;" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
                                     <div style="width: 140px; aspect-ratio: 16/9; background: #000; border-radius: 6px; overflow: hidden; position: relative; flex-shrink: 0;">
