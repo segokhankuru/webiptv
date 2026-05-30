@@ -28,6 +28,9 @@ export async function renderPlayer(channelId) {
                     <div id="video-wrapper" style="width: 100%; aspect-ratio: 16/9; background: #000; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
                         <video id="hls-video" style="width: 100%; height: 100%; outline: none; cursor: pointer;" autoplay></video>
                         
+                        <!-- Netflix Style Subtitle Overlay -->
+                        <div id="subtitle-overlay" style="position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); text-align: center; color: white; font-size: 22px; font-weight: 500; text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 4px; pointer-events: none; z-index: 24; display: none; max-width: 85%; line-height: 1.4; font-family: 'Inter', 'Roboto', sans-serif; transition: all 0.1s;"></div>
+                        
                         <!-- Custom Settings Menu -->
                         <div id="track-settings" style="position: absolute; bottom: 60px; right: 20px; background: rgba(28,28,28,0.95); padding: 15px; border-radius: 8px; color: white; display: none; z-index: 25; min-width: 200px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
                             <div id="resolution-info-container" style="margin-bottom: 15px;">
@@ -412,13 +415,93 @@ export async function renderPlayer(channelId) {
             // Native video player — MKV, MP4 ve diğer doğrudan dosyalar
             video.src = playUrl;
 
+            // Matroska Subtitle Parser Yardımcıları
+            const loadMatroskaParser = () => {
+                return new Promise((resolve, reject) => {
+                    if (window.MatroskaSubtitles) {
+                        resolve(window.MatroskaSubtitles);
+                        return;
+                    }
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/matroska-subtitles@1.1.2/dist/matroska-subtitles.min.js';
+                    script.onload = () => resolve(window.MatroskaSubtitles);
+                    script.onerror = () => reject(new Error('Altyazı kütüphanesi yüklenemedi.'));
+                    document.head.appendChild(script);
+                });
+            };
+
+            const cleanSubtitleText = (text) => {
+                if (!text) return '';
+                let cleaned = text.replace(/\{[^}]+\}/g, ''); // ASS/SSA format etiketlerini temizle
+                cleaned = cleaned.replace(/\\N/g, '<br>');    // Satır sonlarını br yap
+                return cleaned;
+            };
+
+            let subtitleCues = [];
+            let activeTrackNumber = -1;
+            let reader = null;
+            let isReading = false;
+            const subtitleOverlay = document.getElementById('subtitle-overlay');
+
+            const startMatroskaParser = async () => {
+                try {
+                    const MatroskaSubtitles = await loadMatroskaParser();
+                    const parser = new MatroskaSubtitles.SubtitleParser();
+                    
+                    parser.on('tracks', (tracks) => {
+                        const subTracks = tracks.filter(t => t.type === 'subtitle');
+                        if (subTracks.length > 0) {
+                            subtitleContainer.style.display = 'block';
+                            settingsBtn.style.display = 'flex';
+                            
+                            subtitleSelect.innerHTML = '<option value="-1">Kapalı</option>' +
+                                subTracks.map(t => `<option value="${t.number}">${t.name || t.language || 'Altyazı ' + t.number}</option>`).join('');
+                                
+                            subtitleSelect.onchange = (e) => {
+                                activeTrackNumber = parseInt(e.target.value);
+                                if (activeTrackNumber === -1) {
+                                    subtitleOverlay.style.display = 'none';
+                                    subtitleOverlay.innerHTML = '';
+                                }
+                            };
+                        }
+                    });
+
+                    parser.on('subtitle', (subtitle, trackNumber) => {
+                        subtitleCues.push({
+                            trackNumber,
+                            start: subtitle.time / 1000,
+                            end: (subtitle.time + subtitle.duration) / 1000,
+                            text: subtitle.text
+                        });
+                    });
+
+                    isReading = true;
+                    const response = await fetch(playUrl);
+                    reader = response.body.getReader();
+
+                    while (isReading) {
+                        if (video.paused) {
+                            await new Promise(r => setTimeout(r, 500));
+                            continue;
+                        }
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        parser.write(value);
+                        await new Promise(r => setTimeout(r, 10)); // CPU'yu korumak için hafif bekleme
+                    }
+                } catch (err) {
+                    console.log("Matroska altyazıları çözülemedi veya stream okunamadı:", err.message);
+                }
+            };
+
             video.addEventListener('loadedmetadata', () => {
                 video.play().catch(() => {
                     playPauseBtn.innerHTML = icons.play;
                 });
 
                 // ── Ses Track'leri ──────────────────────────────────────────
-                // video.audioTracks: Chrome/Edge destekler, Firefox kısmen destekler
                 const aTracks = video.audioTracks;
                 if (aTracks && aTracks.length > 1) {
                     audioContainer.style.display = 'block';
@@ -428,18 +511,14 @@ export async function renderPlayer(channelId) {
                         `<option value="${i}">${t.label || t.language || 'Ses ' + (i + 1)}</option>`
                     ).join('');
 
-                    audioSelect.addEventListener('change', (e) => {
+                    audioSelect.onchange = (e) => {
                         const idx = parseInt(e.target.value);
                         Array.from(aTracks).forEach((t, i) => { t.enabled = (i === idx); });
-                    });
+                    };
                 }
 
-                // ── Altyazı Track'leri ─────────────────────────────────────
-                // video.textTracks: MP4/WebM içine gömülü WebVTT/TTML track'lerini gösterir.
-                // Not: MKV container içine gömülü SRT/ASS tarayıcılar tarafından OKUNABİLİR
-                // DEĞİLDİR — bu tarayıcının kısıtlamasıdır, kodla çözülemez.
+                // ── Altyazı Track'leri (Native varsa) ───────────────────────
                 const tTracks = video.textTracks;
-
                 const populateSubtitles = () => {
                     const validTracks = Array.from(tTracks).filter(t => t.kind === 'subtitles' || t.kind === 'captions');
                     if (validTracks.length > 0) {
@@ -451,29 +530,50 @@ export async function renderPlayer(channelId) {
                                 `<option value="${i}">${t.label || t.language || 'Altyazı ' + (i + 1)}</option>`
                             ).join('');
 
-                        // Başlangıçta hepsini kapat
-                        validTracks.forEach(t => { t.mode = 'hidden'; });
-
-                        subtitleSelect.addEventListener('change', (e) => {
+                        subtitleSelect.onchange = (e) => {
                             const idx = parseInt(e.target.value);
                             validTracks.forEach((t, i) => {
                                 t.mode = (i === idx) ? 'showing' : 'hidden';
                             });
-                        });
+                        };
                     }
                 };
 
-                // Track'ler loadedmetadata anında hazır olmayabilir — addtrack dinle
                 if (tTracks.length > 0) {
                     populateSubtitles();
                 }
-                tTracks.addEventListener('addtrack', populateSubtitles);
+                tTracks.onaddtrack = populateSubtitles;
+
+                // Matroska parser'ı başlat
+                startMatroskaParser();
+            });
+
+            // Video timeupdate ile altyazı senkronizasyonu (Matroska parser için)
+            video.addEventListener('timeupdate', () => {
+                if (activeTrackNumber === -1) return;
+                const now = video.currentTime;
+                const currentCue = subtitleCues.find(c => c.trackNumber === activeTrackNumber && now >= c.start && now <= c.end);
+                if (currentCue) {
+                    subtitleOverlay.style.display = 'block';
+                    subtitleOverlay.innerHTML = cleanSubtitleText(currentCue.text);
+                } else {
+                    subtitleOverlay.style.display = 'none';
+                }
             });
 
             video.addEventListener('error', () => {
                 const codes = { 1: 'Kullanıcı iptal etti', 2: 'Ağ hatası', 3: 'Decode hatası', 4: 'Desteklenmeyen format' };
                 const msg = codes[video.error?.code] || 'Bilinmeyen hata';
                 showToast(`Video yüklenemedi: ${msg}`);
+            });
+
+            // Cleanup event'i (Sayfa kapandığında stream'i keser)
+            window.addEventListener('hashchange', function cleanup() {
+                if (window.location.hash.indexOf('#/player') === -1) {
+                    isReading = false;
+                    if (reader) reader.cancel();
+                    window.removeEventListener('hashchange', cleanup);
+                }
             });
 
         } else if (Hls.isSupported()) {
@@ -487,24 +587,45 @@ export async function renderPlayer(channelId) {
                     console.log('Otomatik oynatma engellendi');
                     playPauseBtn.innerHTML = icons.play;
                 });
-                
+            });
+
+            // Asenkron ses kanalı güncellemelerini yakala
+            const populateHlsAudio = () => {
                 if (hls.audioTracks && hls.audioTracks.length > 1) {
                     audioContainer.style.display = 'block';
                     settingsBtn.style.display = 'block';
-                    audioSelect.innerHTML = hls.audioTracks.map((t, i) => `<option value="${t.id}">${t.name || t.language || 'Ses ' + (i+1)}</option>`).join('');
+                    audioSelect.innerHTML = hls.audioTracks.map((t, i) => 
+                        `<option value="${t.id}">${t.name || t.language || 'Ses ' + (i+1)}</option>`
+                    ).join('');
                     audioSelect.value = hls.audioTrack;
-                    audioSelect.addEventListener('change', (e) => hls.audioTrack = parseInt(e.target.value));
                 }
-                
+            };
+            hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, populateHlsAudio);
+            audioSelect.onchange = (e) => {
+                hls.audioTrack = parseInt(e.target.value);
+            };
+
+            // Asenkron altyazı kanalı güncellemelerini yakala
+            const populateHlsSubtitles = () => {
                 if (hls.subtitleTracks && hls.subtitleTracks.length > 0) {
                     subtitleContainer.style.display = 'block';
                     settingsBtn.style.display = 'block';
                     subtitleSelect.innerHTML = '<option value="-1">Kapalı</option>' + 
-                        hls.subtitleTracks.map((t, i) => `<option value="${t.id}">${t.name || t.language || 'Altyazı ' + (i+1)}</option>`).join('');
+                        hls.subtitleTracks.map((t, i) => 
+                            `<option value="${t.id}">${t.name || t.language || 'Altyazı ' + (i+1)}</option>`
+                        ).join('');
                     subtitleSelect.value = hls.subtitleTrack;
-                    subtitleSelect.addEventListener('change', (e) => hls.subtitleTrack = parseInt(e.target.value));
                 }
-            });
+            };
+            hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, populateHlsSubtitles);
+            
+            // Başlangıçta da bir kez doldurmayı dene
+            populateHlsAudio();
+            populateHlsSubtitles();
+
+            subtitleSelect.onchange = (e) => {
+                hls.subtitleTrack = parseInt(e.target.value);
+            };
 
             hls.on(Hls.Events.ERROR, function(event, data) {
                 if (data.fatal) {
