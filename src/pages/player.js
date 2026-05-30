@@ -551,36 +551,38 @@ export async function renderPlayer(channelId) {
             };
 
             // Matroska Subtitle Parser Yardımcıları
-            const loadMatroskaParser = () => {
-                return new Promise((resolve, reject) => {
-                    if (window.MatroskaSubtitles) {
-                        resolve(window.MatroskaSubtitles);
-                        return;
-                    }
+            const loadMatroskaParser = async () => {
+                if (window.MatroskaSubtitles) {
+                    return window.MatroskaSubtitles;
+                }
+                
+                const proxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://unpkg.com/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
+                const fallbackProxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://cdn.jsdelivr.net/npm/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
+                
+                const tryFetchAndEval = async (url) => {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Status ${response.status}`);
+                    const codeText = await response.text();
                     
-                    const tryLoad = (url, fallbackUrl) => {
-                        const script = document.createElement('script');
-                        script.src = url;
-                        script.onload = () => resolve(window.MatroskaSubtitles);
-                        script.onerror = () => {
-                            script.remove();
-                            if (fallbackUrl) {
-                                console.warn(`Altyazı kütüphanesi ${url} üzerinden yüklenemedi, fallback deneniyor...`);
-                                tryLoad(fallbackUrl, null);
-                            } else {
-                                reject(new Error('Altyazı kütüphanesi yüklenemedi.'));
-                            }
-                        };
-                        document.head.appendChild(script);
-                    };
+                    // Kodu global scope'ta çalıştır (script enjeksiyonu engellerini bypass eder)
+                    (new Function(codeText))();
+                    
+                    if (!window.MatroskaSubtitles) {
+                        throw new Error("Kütüphane eval edildi ancak MatroskaSubtitles tanımlanamadı.");
+                    }
+                    return window.MatroskaSubtitles;
+                };
 
-                    // Tracking Prevention bypass: Script'i kendi proxy endpoint'imiz üzerinden yükle!
-                    // Böylece tarayıcı bunu harici domain olarak algılamaz ve bloklamaz. Vercel'de de 404 vermez.
-                    const proxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://unpkg.com/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
-                    const fallbackProxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://cdn.jsdelivr.net/npm/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
-
-                    tryLoad(proxyUrl, fallbackProxyUrl);
-                });
+                try {
+                    return await tryFetchAndEval(proxyUrl);
+                } catch (err) {
+                    console.warn("Yerel proxy üzerinden parser yüklenemedi, fallback deneniyor...", err);
+                    try {
+                        return await tryFetchAndEval(fallbackProxyUrl);
+                    } catch (fallbackErr) {
+                        throw new Error("Altyazı kütüphanesi yüklenemedi: " + fallbackErr.message);
+                    }
+                }
             };
 
             const cleanSubtitleText = (text) => {
