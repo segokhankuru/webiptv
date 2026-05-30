@@ -81,11 +81,17 @@ async function saveChannels(sourceId, channels, onProgress) {
             const ch = channels[i];
             // Skip channels without a valid stream URL (safety guard)
             if (!ch.streamUrl) continue;
+
+            let logo = ch.logo || null;
+            if (logo && logo.startsWith('http://')) {
+                logo = `/api/proxy/m3u?url=${encodeURIComponent(logo)}`;
+            }
+
             const record = {
                 sourceId: sid,
                 name: ch.name || 'Bilinmeyen',
                 category: ch.category || 'Genel',
-                logo: ch.logo || null,
+                logo: logo,
                 streamUrl: ch.streamUrl,
                 resolution: ch.resolution || 'SD',
                 country: ch.country || null

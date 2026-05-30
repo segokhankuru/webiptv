@@ -134,9 +134,17 @@ export async function renderPlayer(channelId) {
         if (!channel) throw new Error('Kanal bulunamadı');
         const fallbackChar = channel.name.substring(0, 2).toUpperCase();
         
+        const proxyLogoUrl = (url) => {
+            if (!url) return '';
+            if (url.startsWith('http://')) {
+                return `/api/proxy/m3u?url=${encodeURIComponent(url)}`;
+            }
+            return url;
+        };
+
         document.getElementById('channel-name').innerText = channel.name;
         document.getElementById('channel-category').innerText = channel.category;
-        document.getElementById('channel-logo').src = channel.logo || `https://placehold.co/50x50/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
+        document.getElementById('channel-logo').src = proxyLogoUrl(channel.logo) || `https://placehold.co/50x50/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
         document.getElementById('resolution-display').innerText = 'Bağlanıyor...';
         
         // Load related channels from IndexedDB
@@ -147,12 +155,12 @@ export async function renderPlayer(channelId) {
                     const allChannels = res.data.filter(c => c.id != channelId);
                     const relatedContainer = document.getElementById('related-channels');
                     const searchInput = document.getElementById('related-search');
-
+ 
                     const renderRelated = (list) => {
                         let rHtml = '';
                         const displayList = list.slice(0, 100);
                         for (const rc of displayList) {
-                            const rLogo = rc.logo || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(rc.name.substring(0,2).toUpperCase())}`;
+                            const rLogo = proxyLogoUrl(rc.logo) || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(rc.name.substring(0,2).toUpperCase())}`;,2).toUpperCase())}`;
                             rHtml += `
                                 <div onclick="window.location.hash='#/player/${rc.id}'" style="display: flex; gap: 10px; cursor: pointer; transition: background 0.2s; padding: 5px; border-radius: 8px;" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
                                     <div style="width: 140px; aspect-ratio: 16/9; background: #000; border-radius: 6px; overflow: hidden; position: relative; flex-shrink: 0;">
@@ -415,6 +423,109 @@ export async function renderPlayer(channelId) {
             // Native video player — MKV, MP4 ve diğer doğrudan dosyalar
             video.src = playUrl;
 
+            // ── Xtream API Entegrasyonu (Gelişmiş Otomatik Altyazı Arama) ──
+            const srtToVtt = (srtText) => {
+                let vtt = "WEBVTT\n\n";
+                let text = srtText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                const regex = /(\d{2}:\d{2}:\d{2}),(\d{3})/g;
+                text = text.replace(regex, '$1.$2');
+                vtt += text;
+                return vtt;
+            };
+
+            const parseXtreamUrl = (url) => {
+                try {
+                    const urlObj = new URL(url);
+                    const host = urlObj.origin;
+                    const pathParts = urlObj.pathname.split('/');
+                    if (pathParts.length >= 5) {
+                        const type = pathParts[1];
+                        const username = pathParts[2];
+                        const password = pathParts[3];
+                        const filePart = pathParts[4];
+                        const streamId = filePart.split('.')[0];
+                        if ((type === 'movie' || type === 'series') && username && password && streamId) {
+                            return { host, type, username, password, streamId };
+                        }
+                    }
+                } catch (e) {
+                    console.log("Xtream URL değil");
+                }
+                return null;
+            };
+
+            let xtreamSubsLoaded = false;
+
+            const loadXtreamSubtitles = async (xtream) => {
+                try {
+                    const res = await apiClient.request('/proxy/xtream', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            url: `${xtream.host}/player_api.php`,
+                            params: {
+                                username: xtream.username,
+                                password: xtream.password,
+                                action: xtream.type === 'movie' ? 'get_vod_info' : 'get_series_info',
+                                [xtream.type === 'movie' ? 'vod_id' : 'series_id']: xtream.streamId
+                            }
+                        })
+                    });
+
+                    let subs = [];
+                    if (res && res.info && res.info.subtitles) {
+                        subs = res.info.subtitles;
+                    }
+
+                    if (subs && subs.length > 0) {
+                        xtreamSubsLoaded = true;
+                        subtitleContainer.style.display = 'block';
+                        settingsBtn.style.display = 'flex';
+
+                        subtitleSelect.innerHTML = '<option value="-1">Kapalı</option>' +
+                            subs.map((s, i) => `<option value="${i}">${s.language || 'Altyazı ' + (i+1)} (${s.extension})</option>`).join('');
+
+                        subtitleSelect.onchange = async (e) => {
+                            const idx = parseInt(e.target.value);
+                            const existingTracks = video.querySelectorAll('track.dynamic-sub');
+                            existingTracks.forEach(t => t.remove());
+
+                            if (idx === -1) return;
+
+                            const selectedSub = subs[idx];
+                            const subUrl = `/api/proxy/m3u?url=${encodeURIComponent(selectedSub.url)}`;
+                            
+                            try {
+                                const subResponse = await fetch(subUrl);
+                                let subText = await subResponse.text();
+                                
+                                if (selectedSub.extension === 'srt' || !subText.startsWith('WEBVTT')) {
+                                    subText = srtToVtt(subText);
+                                }
+                                
+                                const blob = new Blob([subText], { type: 'text/vtt' });
+                                const blobUrl = URL.createObjectURL(blob);
+                                
+                                const track = document.createElement('track');
+                                track.className = 'dynamic-sub';
+                                track.src = blobUrl;
+                                track.kind = 'subtitles';
+                                track.srclang = selectedSub.language.substring(0, 2).toLowerCase();
+                                track.label = selectedSub.language;
+                                track.default = true;
+                                
+                                video.appendChild(track);
+                                track.track.mode = 'showing';
+                            } catch (err) {
+                                console.error("Altyazı yüklenemedi:", err);
+                                showToast("Altyazı yüklenemedi");
+                            }
+                        };
+                    }
+                } catch (err) {
+                    console.error("Xtream altyazı bilgileri alınamadı:", err);
+                }
+            };
+
             // Matroska Subtitle Parser Yardımcıları
             const loadMatroskaParser = () => {
                 return new Promise((resolve, reject) => {
@@ -444,11 +555,13 @@ export async function renderPlayer(channelId) {
             const subtitleOverlay = document.getElementById('subtitle-overlay');
 
             const startMatroskaParser = async () => {
+                if (xtreamSubsLoaded) return; // Yarış durumunu engelle
                 try {
                     const MatroskaSubtitles = await loadMatroskaParser();
                     const parser = new MatroskaSubtitles.SubtitleParser();
                     
                     parser.on('tracks', (tracks) => {
+                        if (xtreamSubsLoaded) return; // Yarış durumunu engelle
                         const subTracks = tracks.filter(t => t.type === 'subtitle');
                         if (subTracks.length > 0) {
                             subtitleContainer.style.display = 'block';
@@ -544,8 +657,17 @@ export async function renderPlayer(channelId) {
                 }
                 tTracks.onaddtrack = populateSubtitles;
 
-                // Matroska parser'ı başlat
-                startMatroskaParser();
+                // Altyazıları yükle (Önce Xtream API, yoksa local parser fallback)
+                const xtream = parseXtreamUrl(rawUrl);
+                if (xtream) {
+                    loadXtreamSubtitles(xtream).then(() => {
+                        if (!xtreamSubsLoaded) {
+                            startMatroskaParser();
+                        }
+                    });
+                } else {
+                    startMatroskaParser();
+                }
             });
 
             // Video timeupdate ile altyazı senkronizasyonu (Matroska parser için)

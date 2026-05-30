@@ -22,7 +22,8 @@ router.get('/m3u', async (req, res) => {
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        const contentType = response.headers.get('content-type') || 'text/plain; charset=utf-8';
+        res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Length', buffer.length);
         res.send(buffer);
         
