@@ -382,6 +382,9 @@ export async function renderPlayer(channelId) {
         });
 
         let hls = null;
+        if (!channel.streamUrl) {
+            throw new Error('Bu kanal için yayın adresi (streamUrl) bulunamadı. Profili yeniden senkronize edin.');
+        }
         if (Hls.isSupported()) {
             hls = new Hls({ maxBufferLength: 30, enableWorker: true });
             hls.loadSource(channel.streamUrl);

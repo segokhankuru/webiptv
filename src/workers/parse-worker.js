@@ -15,46 +15,54 @@ function mapCategoryPrefix(prefix) {
     return map[prefix] || prefix;
 }
 
-function parseM3uChunk(lines) {
+function parseM3u(text) {
     const channels = [];
+    // Split on any line ending (
+, 
+, or )
+    const lines = text.split(/\r?\n|\r/);
     let currentInfo = null;
-    
-    for (const line of lines) {
-        const tLine = line.trim();
+
+    for (let i = 0; i < lines.length; i++) {
+        const tLine = lines[i].trim();
         if (!tLine) continue;
-        
+
         if (tLine.startsWith('#EXTINF:')) {
             currentInfo = tLine;
-        } else if (tLine.startsWith('http')) {
-            if (currentInfo) {
-                const match = currentInfo.match(/#EXTINF:[^,]*,(.+)/);
-                if (match) {
-                    const fullName = match[1].trim();
-                    let category = 'Genel';
-                    let name = fullName;
-                    
-                    const catMatch = fullName.match(/^([A-Z]{2,3}):\s*(.+)/);
-                    if (catMatch) {
-                        category = mapCategoryPrefix(catMatch[1]);
-                        name = catMatch[2].trim();
-                    }
-                    
-                    const groupMatch = currentInfo.match(/group-title="([^"]+)"/);
-                    if (groupMatch) category = groupMatch[1];
-                    
-                    const logoMatch = currentInfo.match(/tvg-logo="([^"]+)"/);
-                    
-                    channels.push({
-                        name,
-                        category,
-                        logo: logoMatch ? logoMatch[1] : null,
-                        streamUrl: tLine,
-                        resolution: extractResolution(name),
-                        country: catMatch ? catMatch[1] : null
-                    });
+        } else if (currentInfo && (tLine.startsWith('http') || tLine.startsWith('rtmp') || tLine.startsWith('rtsp') || tLine.startsWith('udp') || tLine.startsWith('rtp'))) {
+            const match = currentInfo.match(/#EXTINF:[^,]*,(.+)/);
+            if (match) {
+                const fullName = match[1].trim();
+                let category = 'Genel';
+                let name = fullName;
+
+                const catMatch = fullName.match(/^([A-Z]{2,3}):\s*(.+)/);
+                if (catMatch) {
+                    category = mapCategoryPrefix(catMatch[1]);
+                    name = catMatch[2].trim();
                 }
-                currentInfo = null;
+
+                const groupMatch = currentInfo.match(/group-title="([^"]+)"/);
+                if (groupMatch) category = groupMatch[1];
+
+                const logoMatch = currentInfo.match(/tvg-logo="([^"]+)"/);
+
+                channels.push({
+                    name: name || 'Bilinmeyen',
+                    category,
+                    logo: logoMatch ? logoMatch[1] : null,
+                    streamUrl: tLine,
+                    resolution: extractResolution(name),
+                    country: catMatch ? catMatch[1] : null
+                });
             }
+            currentInfo = null;
+        } else if (tLine.startsWith('#')) {
+            // Other directives: skip but don't reset currentInfo for non-empty non-EXTINF lines
+            // (some M3U files have comments between EXTINF and URL)
+        } else {
+            // Non-http line that isn't a comment - reset currentInfo
+            currentInfo = null;
         }
     }
     return channels;
@@ -63,21 +71,13 @@ function parseM3uChunk(lines) {
 self.onmessage = async (e) => {
     try {
         const { text } = e.data;
-        const lines = text.split('\n');
-        
-        let allChannels = [];
-        const chunkSize = 10000;
-        
-        for (let i = 0; i < lines.length; i += chunkSize) {
-            const chunk = parseM3uChunk(lines.slice(i, i + chunkSize));
-            allChannels = allChannels.concat(chunk);
-            
-            self.postMessage({ 
-                type: 'progress', 
-                percent: Math.min(100, Math.round(((i + chunkSize) / lines.length) * 100)) 
-            });
-        }
-        
+
+        // Progress: parsing started
+        self.postMessage({ type: 'progress', percent: 10 });
+
+        const allChannels = parseM3u(text);
+
+        self.postMessage({ type: 'progress', percent: 100 });
         self.postMessage({ type: 'done', channels: allChannels });
     } catch (err) {
         self.postMessage({ type: 'error', message: err.message });

@@ -79,6 +79,8 @@ async function saveChannels(sourceId, channels, onProgress) {
 
         for (let i = 0; i < total; i++) {
             const ch = channels[i];
+            // Skip channels without a valid stream URL (safety guard)
+            if (!ch.streamUrl) continue;
             const record = {
                 sourceId: sid,
                 name: ch.name || 'Bilinmeyen',

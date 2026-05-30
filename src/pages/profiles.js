@@ -237,10 +237,29 @@ export async function renderProfiles() {
         const localCount = await channelDB.getChannelCount(profile.id);
         
         if (localCount > 0) {
-            // Kanallar zaten cihazda kayıtlı, direkt aç
-            localStorage.setItem('iptv_active_source_id', profile.id);
-            apiClient.store.activeSource = profile;
-            window.location.hash = '#/home';
+            // Hızlı geçerlilik kontrolü: ilk kanalın streamUrl'i var mı?
+            const firstBatch = await channelDB.getChannelsByCategory(
+                profile.id, undefined, 1, 1
+            ).catch(() => null);
+            
+            // getChannelsByCategory kategori gerektiriyor — kategori listesi üzerinden kontrol et
+            const cats = await channelDB.getCategories(profile.id).catch(() => []);
+            let hasValidChannel = false;
+            if (cats.length > 0) {
+                const sample = await channelDB.getChannelsByCategory(profile.id, cats[0].category, 1, 1).catch(() => ({ data: [] }));
+                hasValidChannel = sample.data && sample.data.length > 0 && !!sample.data[0].streamUrl;
+            }
+            
+            if (hasValidChannel) {
+                // Kanallar geçerli — direkt aç
+                localStorage.setItem('iptv_active_source_id', profile.id);
+                apiClient.store.activeSource = profile;
+                window.location.hash = '#/home';
+            } else {
+                // Eski/bozuk veri — temizle ve yeniden senkronize et
+                await channelDB.clearChannels(profile.id);
+                startSync(profile);
+            }
         } else {
             // İlk kez açılıyor veya temizlenmiş — senkronizasyon gerekli
             startSync(profile);
