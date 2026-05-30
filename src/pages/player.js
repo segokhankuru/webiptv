@@ -385,9 +385,47 @@ export async function renderPlayer(channelId) {
         if (!channel.streamUrl) {
             throw new Error('Bu kanal için yayın adresi (streamUrl) bulunamadı. Profili yeniden senkronize edin.');
         }
-        if (Hls.isSupported()) {
+
+        /**
+         * Mixed Content düzeltmesi:
+         * Uygulama https:// üzerinde çalışıyor. Eğer stream URL'i http:// ile başlıyorsa
+         * tarayıcı bunu "Mixed Content" olarak bloklar. Bunu çözmek için sunucu tarafındaki
+         * proxy endpoint'i üzerinden geçiriyoruz.
+         */
+        const rawUrl = channel.streamUrl;
+        const needsProxy = rawUrl.startsWith('http://');
+        const playUrl = needsProxy
+            ? `/api/proxy/stream?url=${encodeURIComponent(rawUrl)}`
+            : rawUrl;
+
+        /**
+         * Format algılama:
+         * - .m3u8 → HLS.js ile oynat
+         * - .mkv, .mp4, .ts, .avi, .mov, .webm → native <video> ile oynat
+         * - Bilinmeyen → önce HLS.js dene, hata alırsa native'e düş
+         */
+        const urlLower = rawUrl.toLowerCase().split('?')[0]; // query string'i çıkar
+        const isDirectVideo = /\.(mkv|mp4|avi|mov|webm|flv|wmv|ogv|3gp|m4v|ts)$/.test(urlLower);
+        const isHls = urlLower.endsWith('.m3u8') || urlLower.includes('.m3u8?');
+
+        if (isDirectVideo || (!isHls && !Hls.isSupported())) {
+            // Native video player — MKV, MP4 ve diğer doğrudan dosyalar
+            video.src = playUrl;
+            video.addEventListener('loadedmetadata', () => {
+                video.play().catch(() => {
+                    playPauseBtn.innerHTML = icons.play;
+                });
+            });
+            video.addEventListener('error', (e) => {
+                const codes = { 1: 'Kullanıcı iptal etti', 2: 'Ağ hatası', 3: 'Decode hatası', 4: 'Desteklenmeyen format' };
+                const msg = codes[video.error?.code] || 'Bilinmeyen hata';
+                showToast(`Video yüklenemedi: ${msg}`);
+            });
+
+        } else if (Hls.isSupported()) {
+            // HLS.js — .m3u8 stream'ler
             hls = new Hls({ maxBufferLength: 30, enableWorker: true });
-            hls.loadSource(channel.streamUrl);
+            hls.loadSource(playUrl);
             hls.attachMedia(video);
             
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
@@ -413,6 +451,13 @@ export async function renderPlayer(channelId) {
                     subtitleSelect.addEventListener('change', (e) => hls.subtitleTrack = parseInt(e.target.value));
                 }
             });
+
+            hls.on(Hls.Events.ERROR, function(event, data) {
+                if (data.fatal) {
+                    showToast('Yayın yüklenemedi. Bağlantı hatası.');
+                    playPauseBtn.innerHTML = icons.play;
+                }
+            });
             
             window.addEventListener('hashchange', function cleanup() {
                 if (window.location.hash.indexOf('#/player') === -1) {
@@ -422,7 +467,8 @@ export async function renderPlayer(channelId) {
             });
             
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = channel.streamUrl;
+            // Safari native HLS
+            video.src = playUrl;
             video.addEventListener('loadedmetadata', () => video.play());
         }
 
