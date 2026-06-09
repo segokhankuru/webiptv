@@ -268,3 +268,146 @@
 @media (max-width: 600px) {
     .channel-card { flex: 0 0 calc(100% / 3 - 8px); }
 }
+
+/* ===== MOBİL RESPONSIVE & HAMBURGER MENÜ ===== */
+
+/* Hamburger Butonu */
+.hamburger-btn {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    flex-direction: column;
+    gap: 5px;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    margin-left: auto;
+}
+.hamburger-btn span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: #fff;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+/* Mobil Nav Drawer */
+.mobile-nav-drawer {
+    display: none;
+    position: fixed;
+    top: 52px;
+    left: 0;
+    right: 0;
+    background: rgba(20, 20, 20, 0.98);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 99;
+    padding: 10px 0;
+    border-bottom: 1px solid #2a2a2a;
+    animation: mobileNavSlide 0.2s ease-out;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+}
+.mobile-nav-drawer.open {
+    display: block;
+}
+.mobile-nav-drawer a {
+    display: block;
+    color: #fff;
+    padding: 14px 24px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    border-bottom: 1px solid #1e1e1e;
+    transition: background 0.15s;
+}
+.mobile-nav-drawer a:last-child {
+    border-bottom: none;
+}
+.mobile-nav-drawer a:hover,
+.mobile-nav-drawer a:active {
+    background: rgba(229,9,20,0.15);
+    color: #e50914;
+}
+
+@keyframes mobileNavSlide {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+    /* Hamburger göster, nav-links gizle */
+    .hamburger-btn {
+        display: flex !important;
+    }
+    .nav-links {
+        display: none !important;
+    }
+
+    /* Navbar compact */
+    .netflix-navbar {
+        padding: 0 4%;
+        height: 52px;
+    }
+    .logo {
+        font-size: 17px;
+        margin-right: 0;
+    }
+
+    /* Hero daha küçük */
+    .hero-section {
+        height: 28vh;
+        min-height: 160px;
+    }
+    .hero-title { font-size: 1.4rem; }
+    .hero-desc { font-size: 0.82rem; }
+
+    /* Kategoriler */
+    .categories-container {
+        padding: 0 3%;
+    }
+    .category-title {
+        font-size: 13px;
+    }
+
+    /* Kanal kartları: Mobilde 3 kolon */
+    .channel-card {
+        flex: 0 0 calc(100% / 3 - 6px) !important;
+        min-width: 85px;
+    }
+
+    /* Slider butonları mobilde gizle — swipe yeterli */
+    .slider-btn {
+        display: none !important;
+    }
+
+    /* Yatay scroll için touch-action */
+    .channels-slider {
+        touch-action: pan-x;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Player sayfası: mobilde dikey düzen */
+    .related-sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-top: 16px;
+    }
+
+    /* Profil kartları başlık */
+    .profiles-wrapper h1 {
+        font-size: 1.8rem !important;
+        margin-bottom: 24px !important;
+    }
+
+    /* Player kontrolleri mobilde büyük dokunma alanı */
+    #custom-controls button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+    #volume-slider {
+        display: none;
+    }
+}

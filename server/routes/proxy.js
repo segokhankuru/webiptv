@@ -16,17 +16,17 @@ router.get('/m3u', async (req, res) => {
                 'Accept-Encoding': 'gzip, deflate, br'
             }
         });
-        
+
         if (!response.ok) throw new Error(`Status: ${response.status} ${response.statusText}`);
-        
+
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        
+
         const contentType = response.headers.get('content-type') || 'text/plain; charset=utf-8';
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Length', buffer.length);
         res.send(buffer);
-        
+
     } catch (err) {
         console.error('Proxy Error:', err.message);
         if (!res.headersSent) {
@@ -49,7 +49,7 @@ router.post('/xtream', async (req, res) => {
 
         const response = await fetch(urlObj.toString());
         if (!response.ok) throw new Error(`Failed to fetch from target: ${response.status}`);
-        
+
         const data = await response.json();
         res.json(data);
     } catch (err) {

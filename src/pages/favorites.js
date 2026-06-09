@@ -19,7 +19,22 @@ export async function renderFavorites() {
                     </a>
                     <button onclick="localStorage.removeItem('iptv_token'); localStorage.removeItem('iptv_active_source_id'); window.location.hash='#/login'; window.location.reload();" style="background: transparent; color: #aaa; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">Çıkış</button>
                 </div>
+                <!-- Hamburger Butonu (Mobil) -->
+                <button class="hamburger-btn" id="hamburger-btn" aria-label="Menü">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
             </nav>
+
+            <!-- Mobil Nav Drawer -->
+            <div class="mobile-nav-drawer" id="mobile-nav-drawer">
+                <a href="#/home">🏠 Ana Sayfa</a>
+                <a href="#/search">🔍 Arama</a>
+                <a href="#/favorites">❤️ Favoriler</a>
+                <a href="#/profiles" style="color: #FFC107;">🔄 Profil Değiştir</a>
+            </div>
+
             
             <div style="padding: 100px 4% 50px 4%;">
                 <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 30px;">
@@ -36,6 +51,19 @@ export async function renderFavorites() {
             </div>
         </div>
     `;
+
+    // Hamburger menü
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const mobileDrawer = document.getElementById('mobile-nav-drawer');
+    if (hamburgerBtn && mobileDrawer) {
+        hamburgerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            mobileDrawer.classList.toggle('open');
+        });
+        mobileDrawer.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => mobileDrawer.classList.remove('open'));
+        });
+    }
 
     try {
         const favs = await apiClient.request('/user/favorites');

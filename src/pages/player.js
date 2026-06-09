@@ -18,7 +18,22 @@ export async function renderPlayer(channelId) {
                 <div class="user-profile">
                     <img src="https://ui-avatars.com/api/?name=${apiClient.store?.user?.username || 'U'}&background=e50914&color=fff" alt="User">
                 </div>
+                <!-- Hamburger Butonu (Mobil) -->
+                <button class="hamburger-btn" id="hamburger-btn" aria-label="Menü">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
             </nav>
+
+            <!-- Mobil Nav Drawer -->
+            <div class="mobile-nav-drawer" id="mobile-nav-drawer">
+                <a href="#/home">🏠 Ana Sayfa</a>
+                <a href="#/search">🔍 Arama</a>
+                <a href="#/favorites">❤️ Favoriler</a>
+                <a href="#/profiles" style="color: #FFC107;">🔄 Profil Değiştir</a>
+            </div>
+
             
             <!-- Removed max-width to allow the player to expand horizontally -->
             <div style="display: flex; flex-direction: row; padding: 80px 2% 20px 2%; gap: 24px; width: 100%; margin: 0 auto; align-items: flex-start; flex-wrap: wrap; box-sizing: border-box;">
@@ -26,7 +41,7 @@ export async function renderPlayer(channelId) {
                 <!-- Left: Video Player and Info -->
                 <div style="flex: 1; min-width: 60%;">
                     <div id="video-wrapper" style="width: 100%; aspect-ratio: 16/9; background: #000; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
-                        <video id="hls-video" style="width: 100%; height: 100%; outline: none; cursor: pointer;" autoplay></video>
+                        <video id="hls-video" style="width: 100%; height: 100%; outline: none; cursor: pointer;" autoplay playsinline webkit-playsinline x5-playsinline></video>
                         
                         <!-- Netflix Style Subtitle Overlay -->
                         <div id="subtitle-overlay" style="position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); text-align: center; color: white; font-size: 22px; font-weight: 500; text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 4px; pointer-events: none; z-index: 24; display: none; max-width: 85%; line-height: 1.4; font-family: 'Inter', 'Roboto', sans-serif; transition: all 0.1s;"></div>
@@ -127,6 +142,19 @@ export async function renderPlayer(channelId) {
         toast.innerText = msg;
         document.body.appendChild(toast);
         setTimeout(() => { toast.style.opacity = 0; setTimeout(() => toast.remove(), 500); }, 2000);
+    }
+
+    // Hamburger menü
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const mobileDrawer = document.getElementById('mobile-nav-drawer');
+    if (hamburgerBtn && mobileDrawer) {
+        hamburgerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            mobileDrawer.classList.toggle('open');
+        });
+        mobileDrawer.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => mobileDrawer.classList.remove('open'));
+        });
     }
 
     try {
@@ -275,6 +303,10 @@ export async function renderPlayer(channelId) {
         videoWrapper.addEventListener('mousemove', showControls);
         videoWrapper.addEventListener('mouseenter', showControls);
         videoWrapper.addEventListener('mouseleave', () => { if (!video.paused) controls.style.opacity = '0'; });
+        // Mobil touch desteği: dokunmak kontrolleri gösterir
+        videoWrapper.addEventListener('touchstart', (e) => {
+            showControls();
+        }, { passive: true });
 
         // Play/Pause
         const togglePlay = () => {
@@ -735,14 +767,11 @@ export async function renderPlayer(channelId) {
                 showToast(`Video yüklenemedi: ${msg}`);
             });
 
-            // Cleanup event'i (Sayfa kapandığında stream'i keser)
-            window.addEventListener('hashchange', function cleanup() {
-                if (window.location.hash.indexOf('#/player') === -1) {
-                    isReading = false;
-                    if (reader) reader.cancel();
-                    window.removeEventListener('hashchange', cleanup);
-                }
-            });
+            // Cleanup: Router tarafından sayfa değişiminde çağrılır
+            window.__currentPageCleanup = function() {
+                isReading = false;
+                if (reader) reader.cancel();
+            };
 
         } else if (Hls.isSupported()) {
             // HLS.js — .m3u8 stream'ler
@@ -802,12 +831,13 @@ export async function renderPlayer(channelId) {
                 }
             });
             
-            window.addEventListener('hashchange', function cleanup() {
-                if (window.location.hash.indexOf('#/player') === -1) {
-                    if (hls) hls.destroy();
-                    window.removeEventListener('hashchange', cleanup);
+            // Cleanup: Router tarafından sayfa değişiminde çağrılır
+            window.__currentPageCleanup = function() {
+                if (hls) {
+                    hls.destroy();
+                    hls = null;
                 }
-            });
+            };
             
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             // Safari native HLS

@@ -33,11 +33,29 @@ export async function renderHome() {
                         <div style="width: 32px; height: 32px; border-radius: 4px; background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; color: white;">
                             ${profileInitial}
                         </div>
-                        <span style="font-size: 14px; font-weight: 500; color: #eee;">${activeProfileName}</span>
+                        <span class="nav-profile-name" style="font-size: 14px; font-weight: 500; color: #eee;">${activeProfileName}</span>
                     </a>
-                    <button onclick="localStorage.removeItem('iptv_token'); localStorage.removeItem('iptv_active_source_id'); window.location.hash='#/login'; window.location.reload();" style="background: transparent; color: #aaa; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">Çıkış</button>
+                    <button onclick="localStorage.removeItem('iptv_token'); localStorage.removeItem('iptv_active_source_id'); window.location.hash='#/login'; window.location.reload();" style="background: transparent; color: #aaa; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;" class="nav-logout-btn">Çıkış</button>
                 </div>
+                <!-- Hamburger Butonu (Mobil) -->
+                <button class="hamburger-btn" id="hamburger-btn" aria-label="Menü">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
             </nav>
+
+            <!-- Mobil Nav Drawer -->
+            <div class="mobile-nav-drawer" id="mobile-nav-drawer">
+                <a href="#/home">🏠 Ana Sayfa</a>
+                <a href="#/search">🔍 Arama</a>
+                <a href="#/favorites">❤️ Favoriler</a>
+                <a href="#/profiles" style="color: #FFC107;">🔄 Profil Değiştir</a>
+                ${apiClient.store?.user?.role === 'admin' ? '<a href="#/admin" style="color: #E50914;">⚙️ Admin Paneli</a>' : ''}
+                <a href="#/profile">👤 Hesabım</a>
+                <a href="#" onclick="localStorage.removeItem('iptv_token'); localStorage.removeItem('iptv_active_source_id'); window.location.hash='#/login'; window.location.reload(); return false;" style="color: #aaa;">🚪 Çıkış Yap</a>
+            </div>
+
             <div class="hero-section" id="hero-section">
                 <!-- Featured Channel will go here -->
                 <div class="hero-content">
@@ -53,6 +71,26 @@ export async function renderHome() {
             </div>
         </div>
     `;
+
+    // Hamburger menü toggle
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const mobileDrawer = document.getElementById('mobile-nav-drawer');
+    if (hamburgerBtn && mobileDrawer) {
+        hamburgerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            mobileDrawer.classList.toggle('open');
+        });
+        // Drawer'daki linklere tıklayınca kapat
+        mobileDrawer.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => mobileDrawer.classList.remove('open'));
+        });
+        // Drawer dışına tıklayınca kapat
+        document.addEventListener('click', (e) => {
+            if (!mobileDrawer.contains(e.target) && e.target !== hamburgerBtn) {
+                mobileDrawer.classList.remove('open');
+            }
+        }, { passive: true });
+    }
 
     // Navbar scroll effect
     window.addEventListener('scroll', () => {

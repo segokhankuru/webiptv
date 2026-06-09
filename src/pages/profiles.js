@@ -25,19 +25,47 @@ export async function renderProfiles() {
             
             <!-- Sleek Modern Add Profile Modal -->
             <div id="add-profile-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
-                <div class="modal-card" style="background: #181818; padding: 40px; border-radius: 8px; width: 90%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #2f2f2f; transform: scale(0.9); transition: transform 0.3s ease;">
-                    <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 20px; color: #fff;">Profil Ekle</h2>
+                <div class="modal-card" style="background: #181818; padding: 40px; border-radius: 8px; width: 90%; max-width: 520px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #2f2f2f; transform: scale(0.9); transition: transform 0.3s ease;">
+                    <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 8px; color: #fff;">Profil Ekle</h2>
                     <p style="color: #aaa; font-size: 0.95rem; margin-bottom: 25px;">Yeni bir IPTV M3U listesi ekleyerek yeni bir profil oluşturun.</p>
                     
+                    <!-- Profil Adı -->
                     <div style="margin-bottom: 20px;">
                         <label style="display: block; color: #8c8c8c; font-size: 0.85rem; margin-bottom: 8px; font-weight: 600;">PROFİL ADI</label>
                         <input type="text" id="new-profile-name" placeholder="örn: Babamın Odası, Dizi Listesi" style="width: 100%; padding: 14px; background: #333; border: none; border-radius: 4px; color: white; font-size: 1rem; outline: none; box-sizing: border-box;" />
                     </div>
                     
-                    <div style="margin-bottom: 30px;">
-                        <label style="display: block; color: #8c8c8c; font-size: 0.85rem; margin-bottom: 8px; font-weight: 600;">M3U LINK URL</label>
+                    <!-- M3U Link -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; color: #8c8c8c; font-size: 0.85rem; margin-bottom: 8px; font-weight: 600;">M3U LİNK (opsiyonel)</label>
                         <input type="text" id="new-profile-url" placeholder="https://site.com/playlist.m3u" style="width: 100%; padding: 14px; background: #333; border: none; border-radius: 4px; color: white; font-size: 1rem; outline: none; box-sizing: border-box;" />
+                        <p style="color: #555; font-size: 0.8rem; margin: 6px 0 0 0;">Tekrar oturum açtığınızda bu linkten otomatik güncellenir.</p>
                     </div>
+
+                    <!-- Dosya YA DA Ayırıcı -->
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                        <div style="flex: 1; height: 1px; background: #333;"></div>
+                        <span style="color: #555; font-size: 0.8rem; white-space: nowrap;">veya dosya yükle</span>
+                        <div style="flex: 1; height: 1px; background: #333;"></div>
+                    </div>
+
+                    <!-- M3U Dosya Seçici -->
+                    <div style="margin-bottom: 28px;">
+                        <label style="display: block; color: #8c8c8c; font-size: 0.85rem; margin-bottom: 8px; font-weight: 600;">M3U DOSYASI (opsiyonel)</label>
+                        <label id="file-drop-zone" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 20px; background: #242424; border: 2px dashed #444; border-radius: 6px; cursor: pointer; transition: all 0.2s; box-sizing: border-box;">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            <span id="file-drop-label" style="color: #666; font-size: 0.9rem;">Dosyayı buraya sürükleyin veya tıklayın</span>
+                            <span style="color: #444; font-size: 0.75rem;">.m3u, .m3u8 desteklenir</span>
+                            <input type="file" id="new-profile-file" accept=".m3u,.m3u8,text/plain" style="display: none;" />
+                        </label>
+                    </div>
+
+                    <!-- Bilgi Kutusu -->
+                    <div id="source-info-box" style="display: none; background: rgba(229,9,20,0.1); border: 1px solid rgba(229,9,20,0.25); border-radius: 4px; padding: 10px 14px; margin-bottom: 20px; font-size: 0.82rem; color: #e57373;"></div>
                     
                     <div style="display: flex; gap: 15px; justify-content: flex-end;">
                         <button id="cancel-add-btn" style="background: transparent; border: 1px solid #555; color: #fff; padding: 12px 24px; font-weight: 600; cursor: pointer; border-radius: 4px; transition: all 0.2s;">İptal</button>
@@ -83,6 +111,14 @@ export async function renderProfiles() {
             .profile-avatar-box:hover .profile-label {
                 color: white !important;
             }
+            #file-drop-zone:hover {
+                border-color: #E50914 !important;
+                background: rgba(229,9,20,0.05) !important;
+            }
+            #file-drop-zone.dragover {
+                border-color: #E50914 !important;
+                background: rgba(229,9,20,0.1) !important;
+            }
         </style>
     `;
     
@@ -93,6 +129,10 @@ export async function renderProfiles() {
     const addModal = document.getElementById('add-profile-modal');
     const newNameInput = document.getElementById('new-profile-name');
     const newUrlInput = document.getElementById('new-profile-url');
+    const newFileInput = document.getElementById('new-profile-file');
+    const fileDropZone = document.getElementById('file-drop-zone');
+    const fileDropLabel = document.getElementById('file-drop-label');
+    const sourceInfoBox = document.getElementById('source-info-box');
     const cancelAddBtn = document.getElementById('cancel-add-btn');
     const saveProfileBtn = document.getElementById('save-profile-btn');
     
@@ -104,6 +144,7 @@ export async function renderProfiles() {
 
     let isManageMode = false;
     let profiles = [];
+    let selectedFileContent = null; // Seçilen dosyanın içeriği
     
     // Beautiful default gradients for avatars
     const avatarGradients = [
@@ -262,25 +303,40 @@ export async function renderProfiles() {
             }
         } else {
             // İlk kez açılıyor veya temizlenmiş — senkronizasyon gerekli
-            startSync(profile);
+            // Eğer profile'ın URL'si varsa yeniden indir, yoksa hata ver
+            if (profile.m3u_url) {
+                startSync(profile, null);
+            } else {
+                alert('Bu profilin M3U linki yok ve yerel kanal verisi bulunamadı. Profili silip yeniden oluşturun.');
+            }
         }
     }
 
     // Trigger Dynamic Client-Side Sync
-    async function startSync(profile) {
+    // m3uTextOverride: dosyadan yüklenen m3u içeriği (URL'den çekmek yerine)
+    async function startSync(profile, m3uTextOverride) {
         syncModal.style.display = 'flex';
         syncProfileName.innerText = profile.name;
-        syncStatusText.innerText = "Playlist indiriliyor...";
+        syncStatusText.innerText = m3uTextOverride ? "Dosya okunuyor..." : "Playlist indiriliyor...";
         syncProgressFill.style.width = '10%';
         syncPercentText.innerText = '%10';
 
         try {
-            // Fetch M3U text through proxy
-            const m3uText = await apiClient.proxyM3u(profile.m3u_url);
+            let m3uText;
+            
+            if (m3uTextOverride) {
+                // Dosyadan gelen içerik — direkt kullan
+                m3uText = m3uTextOverride;
+                syncProgressFill.style.width = '30%';
+                syncPercentText.innerText = '%30';
+            } else {
+                // URL'den indir
+                m3uText = await apiClient.proxyM3u(profile.m3u_url);
+                syncProgressFill.style.width = '30%';
+                syncPercentText.innerText = '%30';
+            }
             
             syncStatusText.innerText = "Kategorize ediliyor...";
-            syncProgressFill.style.width = '30%';
-            syncPercentText.innerText = '%30';
 
             // Web worker for parsing
             const worker = new Worker(new URL('../workers/parse-worker.js', import.meta.url), { type: 'module' });
@@ -355,6 +411,12 @@ export async function renderProfiles() {
         }, 10);
         newNameInput.value = '';
         newUrlInput.value = '';
+        newFileInput.value = '';
+        selectedFileContent = null;
+        fileDropLabel.textContent = 'Dosyayı buraya sürükleyin veya tıklayın';
+        fileDropLabel.style.color = '#666';
+        sourceInfoBox.style.display = 'none';
+        sourceInfoBox.textContent = '';
         newNameInput.focus();
     }
 
@@ -366,15 +428,77 @@ export async function renderProfiles() {
         }, 300);
     }
 
+    // Dosya seçimi
+    fileDropZone.addEventListener('click', () => newFileInput.click());
+    
+    newFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        readM3UFile(file);
+    });
+
+    // Drag & Drop desteği
+    fileDropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        fileDropZone.classList.add('dragover');
+    });
+    fileDropZone.addEventListener('dragleave', () => {
+        fileDropZone.classList.remove('dragover');
+    });
+    fileDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileDropZone.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file) readM3UFile(file);
+    });
+
+    function readM3UFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            selectedFileContent = e.target.result;
+            fileDropLabel.textContent = `✓ ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+            fileDropLabel.style.color = '#4caf50';
+            fileDropZone.style.borderColor = '#4caf50';
+            updateInfoBox();
+        };
+        reader.onerror = () => {
+            alert('Dosya okunamadı.');
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    function updateInfoBox() {
+        const hasUrl = newUrlInput.value.trim().length > 0;
+        const hasFile = !!selectedFileContent;
+
+        if (hasFile && hasUrl) {
+            sourceInfoBox.style.display = 'block';
+            sourceInfoBox.innerHTML = '📁 <b>Dosyadan yüklenecek.</b> Link bilgisi saklanacak — bir sonraki oturumda linkten otomatik güncellenir.';
+        } else if (hasFile) {
+            sourceInfoBox.style.display = 'block';
+            sourceInfoBox.innerHTML = '📁 <b>Sadece dosyadan yüklenecek.</b> Link girilmediği için ileride otomatik güncelleme yapılmayacak.';
+        } else {
+            sourceInfoBox.style.display = 'none';
+        }
+    }
+
+    newUrlInput.addEventListener('input', updateInfoBox);
+
     cancelAddBtn.addEventListener('click', closeAddModal);
     
     // Save custom profile
     saveProfileBtn.addEventListener('click', async () => {
         const name = newNameInput.value.trim();
         const url = newUrlInput.value.trim();
-        
-        if (!name || !url) {
-            alert('Lütfen profil adı ve M3U url adresini doldurun.');
+        const hasFile = !!selectedFileContent;
+
+        if (!name) {
+            alert('Lütfen profil adını doldurun.');
+            return;
+        }
+
+        if (!url && !hasFile) {
+            alert('Lütfen M3U linki girin veya bir M3U dosyası seçin.');
             return;
         }
 
@@ -382,13 +506,26 @@ export async function renderProfiles() {
             saveProfileBtn.disabled = true;
             saveProfileBtn.innerText = 'Ekleniyor...';
             
-            await apiClient.addSource({ name, m3u_url: url });
+            // Profili sunucuya kaydet (URL yoksa boş geç)
+            const newProfile = await apiClient.addSource({ 
+                name, 
+                m3u_url: url || null
+            });
             
             closeAddModal();
-            await loadProfiles();
+            
+            // Sync başlat — dosya varsa dosyadan, yoksa URL'den
+            if (hasFile) {
+                await startSync(newProfile, selectedFileContent);
+            } else {
+                await startSync(newProfile, null);
+            }
+            
+            // Sync tamamlandıktan sonra (home'a gidilecek), profil listesini güncelle
+            // Not: startSync() içinde window.location.hash = '#/home' yapılıyor
+            
         } catch (e) {
             alert('Profil eklenemedi: ' + e.message);
-        } finally {
             saveProfileBtn.disabled = false;
             saveProfileBtn.innerText = 'Kaydet';
         }

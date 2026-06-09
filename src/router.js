@@ -18,6 +18,17 @@ export function initRouter() {
 }
 
 function handleRoute() {
+    // Sayfa değişmeden önce önceki sayfanın cleanup fonksiyonunu çağır
+    // Bu HLS destroy, reader cancel, IntersectionObserver disconnect gibi işlemleri anında yapar
+    if (typeof window.__currentPageCleanup === 'function') {
+        try {
+            window.__currentPageCleanup();
+        } catch (e) {
+            console.warn('Page cleanup error:', e);
+        }
+        window.__currentPageCleanup = null;
+    }
+
     const hash = window.location.hash || '#/login';
     
     // Auth Check
