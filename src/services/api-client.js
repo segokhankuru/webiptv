@@ -95,6 +95,19 @@ export const apiClient = {
             body: JSON.stringify(payload)
         });
     },
+
+    async addXtreamSource({ name, server, username, password }) {
+        return this.request('/user/sources', {
+            method: 'POST',
+            body: JSON.stringify({
+                name,
+                source_type: 'xtream',
+                xtream_server: server,
+                xtream_username: username,
+                xtream_password: password
+            })
+        });
+    },
     
     async deleteSource(id) {
         return this.request(`/user/sources/${id}`, { method: 'DELETE' });

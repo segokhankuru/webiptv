@@ -35,7 +35,6 @@ export async function renderFavorites() {
                 <a href="#/profiles" style="color: #FFC107;">🔄 Profil Değiştir</a>
             </div>
 
-            
             <div style="padding: 100px 4% 50px 4%;">
                 <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 30px;">
                     <h2 style="font-size: 2rem; font-weight: 800; color: white; margin: 0;">Favorilerim</h2>
@@ -91,8 +90,19 @@ export async function renderFavorites() {
             const fallbackChar = ch.name.substring(0, 2).toUpperCase();
             const logoUrl = ch.logo_url || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
 
+            let onClickAttr = `window.location.hash='#/player/${ch.channel_id}'`;
+            if (ch.channel_id && ch.channel_id.startsWith('xtream_')) {
+                const playObj = {
+                    name: ch.name,
+                    stream_icon: ch.logo_url,
+                    category_name: 'Favoriler',
+                    container_extension: ch.stream_url ? (ch.stream_url.split('.').pop() || 'm3u8') : 'm3u8'
+                };
+                onClickAttr = `window.playXtreamStream('${ch.channel_id}', '${encodeURIComponent(JSON.stringify(playObj))}')`;
+            }
+
             html += `
-                <div class="channel-card" style="margin-bottom: 10px;" onclick="window.location.hash='#/player/${ch.channel_id}'">
+                <div class="channel-card" style="margin-bottom: 10px;" onclick="${onClickAttr}">
                     <div class="card-img-container">
                         <img src="${logoUrl}" alt="${ch.name}" loading="lazy" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}'">
                         ${resBadge}
@@ -100,7 +110,7 @@ export async function renderFavorites() {
                     </div>
                     <div class="card-info">
                         <h4>${ch.name}</h4>
-                        <p style="font-size: 10px; color: var(--text-secondary); margin: 0; margin-top: 3px;">📁 ${ch.category}</p>
+                        <p style="font-size: 10px; color: var(--text-secondary); margin: 0; margin-top: 3px;">📁 ${ch.category || 'Favori'}</p>
                     </div>
                 </div>
             `;

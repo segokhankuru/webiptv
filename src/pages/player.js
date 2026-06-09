@@ -1,5 +1,6 @@
 import { apiClient } from '../services/api-client.js';
 import { channelDB } from '../services/channel-db.js';
+import { xtreamAPI } from '../services/xtream-api.js';
 import Hls from 'hls.js';
 
 export async function renderPlayer(channelId) {
@@ -158,7 +159,37 @@ export async function renderPlayer(channelId) {
     }
 
     try {
-        const channel = await channelDB.getChannel(channelId);
+        let channel;
+        const isXtream = channelId.startsWith('xtream_');
+        if (isXtream) {
+            const parts = channelId.split('_');
+            const type = parts[1]; // live | vod | series
+            const streamId = parts[2];
+            
+            const playInfoRaw = sessionStorage.getItem('xtream_play_info');
+            let playInfo = {};
+            if (playInfoRaw) {
+                try { playInfo = JSON.parse(playInfoRaw); } catch(e){}
+            }
+            
+            const profile = xtreamAPI.getActiveXtreamProfile();
+            if (!profile) throw new Error('Aktif Xtream profili bulunamadı.');
+            
+            const ext = playInfo.container_extension || (type === 'live' ? 'm3u8' : 'mp4');
+            const streamUrl = xtreamAPI.buildStreamUrl(profile.server_url, profile.username, profile.password, streamId, type, ext);
+            
+            channel = {
+                id: channelId,
+                name: playInfo.name || 'Bilinmeyen Yayın',
+                logo: playInfo.stream_icon || playInfo.cover || '',
+                category: playInfo.category_name || (type === 'live' ? 'Canlı TV' : (type === 'vod' ? 'Film' : 'Dizi')),
+                streamUrl: streamUrl,
+                resolution: playInfo.resolution || ''
+            };
+        } else {
+            channel = await channelDB.getChannel(channelId);
+        }
+
         if (!channel) throw new Error('Kanal bulunamadı');
         const fallbackChar = channel.name.substring(0, 2).toUpperCase();
         
@@ -175,12 +206,62 @@ export async function renderPlayer(channelId) {
         document.getElementById('channel-logo').src = proxyLogoUrl(channel.logo) || `https://placehold.co/50x50/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
         document.getElementById('resolution-display').innerText = 'Bağlanıyor...';
         
-        // Load related channels from IndexedDB
+        // Load related channels
         const sourceId = localStorage.getItem('iptv_active_source_id');
         if (sourceId) {
-            channelDB.getChannelsByCategory(sourceId, channel.category, 1, 10000).then(res => {
+            let loadRelatedPromise;
+            if (isXtream) {
+                const parts = channelId.split('_');
+                const type = parts[1];
+                const playInfoRaw = sessionStorage.getItem('xtream_play_info');
+                let playInfo = {};
+                if (playInfoRaw) {
+                    try { playInfo = JSON.parse(playInfoRaw); } catch(e){}
+                }
+                const categoryId = playInfo.category_id;
+                const profile = xtreamAPI.getActiveXtreamProfile();
+                
+                if (categoryId && profile) {
+                    let fetchPromise;
+                    if (type === 'live') {
+                        fetchPromise = xtreamAPI.getLiveStreams(profile.server_url, profile.username, profile.password, categoryId);
+                    } else if (type === 'vod') {
+                        fetchPromise = xtreamAPI.getVodStreams(profile.server_url, profile.username, profile.password, categoryId);
+                    } else {
+                        fetchPromise = xtreamAPI.getSeriesStreams(profile.server_url, profile.username, profile.password, categoryId);
+                    }
+                    loadRelatedPromise = fetchPromise.then(streams => {
+                        if (Array.isArray(streams)) {
+                            return {
+                                data: streams
+                                    .filter(s => String(s.stream_id || s.series_id) !== String(parts[2]))
+                                    .map(s => {
+                                        const sId = s.stream_id || s.series_id;
+                                        return {
+                                            id: `xtream_${type}_${sId}`,
+                                            name: s.name,
+                                            logo: s.stream_icon || s.cover || '',
+                                            category: channel.category,
+                                            resolution: s.resolution || '',
+                                            raw: s
+                                        };
+                                    })
+                            };
+                        }
+                        return { data: [] };
+                    });
+                } else {
+                    loadRelatedPromise = Promise.resolve({ data: [] });
+                }
+            } else {
+                loadRelatedPromise = channelDB.getChannelsByCategory(sourceId, channel.category, 1, 10000).then(res => ({
+                    data: (res.data || []).filter(c => c.id != channelId)
+                }));
+            }
+
+            loadRelatedPromise.then(res => {
                 if (res.data) {
-                    const allChannels = res.data.filter(c => c.id != channelId);
+                    const allChannels = res.data;
                     const relatedContainer = document.getElementById('related-channels');
                     const searchInput = document.getElementById('related-search');
  
@@ -189,8 +270,14 @@ export async function renderPlayer(channelId) {
                         const displayList = list.slice(0, 100);
                         for (const rc of displayList) {
                             const rLogo = proxyLogoUrl(rc.logo) || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(rc.name.substring(0,2).toUpperCase())}`;
+                            
+                            let onClickAttr = `window.location.hash='#/player/${rc.id}'`;
+                            if (rc.id.startsWith('xtream_') && rc.raw) {
+                                onClickAttr = `window.playXtreamStream('${rc.id}', '${encodeURIComponent(JSON.stringify(rc.raw))}')`;
+                            }
+                            
                             rHtml += `
-                                <div onclick="window.location.hash='#/player/${rc.id}'" style="display: flex; gap: 10px; cursor: pointer; transition: background 0.2s; padding: 5px; border-radius: 8px;" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
+                                <div onclick="${onClickAttr}" style="display: flex; gap: 10px; cursor: pointer; transition: background 0.2s; padding: 5px; border-radius: 8px;" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
                                     <div style="width: 140px; aspect-ratio: 16/9; background: #000; border-radius: 6px; overflow: hidden; position: relative; flex-shrink: 0;">
                                         <img src="${rLogo}" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=TV'">
                                         <span style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.8); color: white; font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: bold;">${rc.resolution || 'SD'}</span>

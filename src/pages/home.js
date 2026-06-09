@@ -1,5 +1,6 @@
 import { apiClient } from '../services/api-client.js';
 import { channelDB } from '../services/channel-db.js';
+import { xtreamAPI } from '../services/xtream-api.js';
 
 export async function renderHome() {
     const container = document.getElementById('app');
@@ -108,43 +109,150 @@ export async function renderHome() {
             return;
         }
 
-        const categories = await channelDB.getCategories(activeId);
         const catContainer = document.getElementById('categories-container');
-        catContainer.innerHTML = ''; // clear loading
 
-        if (categories.length === 0) {
-            catContainer.innerHTML = '<p style="color: var(--text-secondary); text-align:center; padding: 50px;">Bu profilde henüz kanal bulunamadı. Profili seçerek senkronize edin.</p>';
-            return;
-        }
+        if (xtreamAPI.isXtreamProfile()) {
+            // Xtream Codes profile handling
+            const profile = xtreamAPI.getActiveXtreamProfile();
+            const categories = await xtreamAPI.getAllCategories(profile.server_url, profile.username, profile.password);
+            
+            catContainer.innerHTML = ''; // clear loading
 
-        for (const cat of categories) {
-            if (cat.count > 0) {
-                const rowId = `cat-${Math.random().toString(36).substr(2, 9)}`;
+            if (categories.length === 0) {
+                catContainer.innerHTML = '<p style="color: var(--text-secondary); text-align:center; padding: 50px;">Bu profilde kategori bulunamadı.</p>';
+                return;
+            }
+
+            let renderedCount = 0;
+            const batchSize = 15;
+
+            const renderNextBatch = () => {
+                const batch = categories.slice(renderedCount, renderedCount + batchSize);
+                renderedCount += batch.length;
                 
-                const rowHtml = `
-                    <div class="category-row">
-                        <h3 class="category-title" style="display: flex; justify-content: space-between; align-items: center; padding-right: 4%;">
-                            <a href="#/category/${encodeURIComponent(cat.category)}" style="color: inherit; text-decoration: none; cursor: pointer;">
-                                ${cat.category} <span class="count">(${cat.count})</span>
-                            </a>
-                            <a href="#/category/${encodeURIComponent(cat.category)}" style="font-size: 13px; color: var(--accent-color); text-decoration: none; font-weight: 600; padding: 4px 8px; border: 1px solid rgba(229,9,20,0.3); border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='var(--accent-color)'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='var(--accent-color)'">
-                                Tümünü Gör ❱
-                            </a>
-                        </h3>
-                        <div class="slider-container">
-                            <button class="slider-btn left" onclick="document.getElementById('${rowId}').scrollBy({left: -800, behavior: 'smooth'})">❮</button>
-                            <div class="channels-slider" id="${rowId}">
-                                <!-- Loading Placeholder -->
-                                <div style="padding: 20px; color: var(--text-secondary);">Kanallar yükleniyor...</div>
+                batch.forEach(cat => {
+                    const rowId = `cat-${Math.random().toString(36).substr(2, 9)}`;
+                    const encodedCatId = encodeURIComponent(cat.category_id);
+                    const encodedCatName = encodeURIComponent(cat.category_name);
+                    const categoryTypeLabel = cat.type === 'live' ? 'Canlı' : (cat.type === 'vod' ? 'Film' : 'Dizi');
+                    
+                    const rowHtml = `
+                        <div class="category-row xtream-row" data-type="${cat.type}" data-category-id="${cat.category_id}" data-category="${cat.category_name}" data-row-id="${rowId}" data-loaded="false" style="margin-bottom: 25px;">
+                            <h3 class="category-title" style="display: flex; justify-content: space-between; align-items: center; padding-right: 4%;">
+                                <a href="#/category/xtream_${cat.type}_${encodedCatId}_${encodedCatName}" style="color: inherit; text-decoration: none; cursor: pointer;">
+                                    ${cat.category_name} <span class="badge-type" style="font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px; margin-left: 8px; font-weight: 500; color: #aaa;">${categoryTypeLabel}</span>
+                                </a>
+                                <a href="#/category/xtream_${cat.type}_${encodedCatId}_${encodedCatName}" style="font-size: 13px; color: var(--accent-color); text-decoration: none; font-weight: 600; padding: 4px 8px; border: 1px solid rgba(229,9,20,0.3); border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='var(--accent-color)'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='var(--accent-color)'">
+                                    Tümünü Gör ❱
+                                </a>
+                            </h3>
+                            <div class="slider-container">
+                                <button class="slider-btn left" onclick="document.getElementById('${rowId}').scrollBy({left: -800, behavior: 'smooth'})">❮</button>
+                                <div class="channels-slider" id="${rowId}">
+                                    <div class="slider-placeholder" style="padding: 20px; color: var(--text-secondary); display: flex; align-items: center; gap: 10px;">
+                                        <div style="width: 16px; height: 16px; border: 2px solid #555; border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                        Kanal listesi bekleniyor...
+                                    </div>
+                                </div>
+                                <button class="slider-btn right" onclick="document.getElementById('${rowId}').scrollBy({left: 800, behavior: 'smooth'})">❯</button>
                             </div>
-                            <button class="slider-btn right" onclick="document.getElementById('${rowId}').scrollBy({left: 800, behavior: 'smooth'})">❯</button>
                         </div>
-                    </div>
-                `;
-                catContainer.insertAdjacentHTML('beforeend', rowHtml);
+                    `;
+                    catContainer.insertAdjacentHTML('beforeend', rowHtml);
+                    
+                    const element = catContainer.lastElementChild;
+                    rowObserver.observe(element);
+                });
                 
-                // Fetch channels for this category from IndexedDB
-                loadCategoryChannels(cat.category, rowId, activeId);
+                if (renderedCount < categories.length) {
+                    setupLoadMoreCategoriesSensor();
+                }
+            };
+
+            const rowObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const row = entry.target;
+                        rowObserver.unobserve(row);
+                        
+                        const rowId = row.dataset.rowId;
+                        const type = row.dataset.type;
+                        const categoryId = row.dataset.categoryId;
+                        const categoryName = row.dataset.category;
+                        
+                        if (row.dataset.loaded !== 'true') {
+                            row.dataset.loaded = 'true';
+                            loadXtreamCategoryChannels(type, categoryId, categoryName, rowId, profile);
+                        }
+                    }
+                });
+            }, { rootMargin: '150px' });
+
+            let sensorElement = null;
+            const sensorObserver = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting) {
+                    sensorObserver.disconnect();
+                    sensorElement?.remove();
+                    renderNextBatch();
+                }
+            }, { rootMargin: '300px' });
+
+            const setupLoadMoreCategoriesSensor = () => {
+                sensorElement = document.createElement('div');
+                sensorElement.style.cssText = 'height: 60px; display: flex; align-items: center; justify-content: center; color: #888; font-size: 14px;';
+                sensorElement.innerHTML = '⚡ Kalan kategoriler yükleniyor...';
+                catContainer.appendChild(sensorElement);
+                sensorObserver.observe(sensorElement);
+            };
+
+            const prevCleanup = window.__currentPageCleanup;
+            window.__currentPageCleanup = function() {
+                if (prevCleanup) prevCleanup();
+                rowObserver.disconnect();
+                sensorObserver.disconnect();
+            };
+
+            renderNextBatch();
+
+        } else {
+            // Standard M3U IndexedDB profile handling
+            const categories = await channelDB.getCategories(activeId);
+            catContainer.innerHTML = ''; // clear loading
+
+            if (categories.length === 0) {
+                catContainer.innerHTML = '<p style="color: var(--text-secondary); text-align:center; padding: 50px;">Bu profilde henüz kanal bulunamadı. Profili seçerek senkronize edin.</p>';
+                return;
+            }
+
+            for (const cat of categories) {
+                if (cat.count > 0) {
+                    const rowId = `cat-${Math.random().toString(36).substr(2, 9)}`;
+                    
+                    const rowHtml = `
+                        <div class="category-row">
+                            <h3 class="category-title" style="display: flex; justify-content: space-between; align-items: center; padding-right: 4%;">
+                                <a href="#/category/${encodeURIComponent(cat.category)}" style="color: inherit; text-decoration: none; cursor: pointer;">
+                                    ${cat.category} <span class="count">(${cat.count})</span>
+                                </a>
+                                <a href="#/category/${encodeURIComponent(cat.category)}" style="font-size: 13px; color: var(--accent-color); text-decoration: none; font-weight: 600; padding: 4px 8px; border: 1px solid rgba(229,9,20,0.3); border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='var(--accent-color)'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='var(--accent-color)'">
+                                    Tümünü Gör ❱
+                                </a>
+                            </h3>
+                            <div class="slider-container">
+                                <button class="slider-btn left" onclick="document.getElementById('${rowId}').scrollBy({left: -800, behavior: 'smooth'})">❮</button>
+                                <div class="channels-slider" id="${rowId}">
+                                    <!-- Loading Placeholder -->
+                                    <div style="padding: 20px; color: var(--text-secondary);">Kanallar yükleniyor...</div>
+                                </div>
+                                <button class="slider-btn right" onclick="document.getElementById('${rowId}').scrollBy({left: 800, behavior: 'smooth'})">❯</button>
+                            </div>
+                        </div>
+                    `;
+                    catContainer.insertAdjacentHTML('beforeend', rowHtml);
+                    
+                    // Fetch channels for this category from IndexedDB
+                    loadCategoryChannels(cat.category, rowId, activeId);
+                }
             }
         }
 
@@ -155,7 +263,6 @@ export async function renderHome() {
 
 async function loadCategoryChannels(categoryName, rowId, sourceId) {
     try {
-        // IndexedDB'den kategori kanallarını çek (ana sayfa için 10 kanal yeterli)
         const response = await channelDB.getChannelsByCategory(sourceId, categoryName, 1, 10);
         const slider = document.getElementById(rowId);
         
@@ -213,5 +320,71 @@ async function loadCategoryChannels(categoryName, rowId, sourceId) {
 
     } catch(e) {
         document.getElementById(rowId).innerHTML = '<p style="padding: 20px; color: red;">Yüklenemedi</p>';
+    }
+}
+
+async function loadXtreamCategoryChannels(type, categoryId, categoryName, rowId, profile) {
+    const slider = document.getElementById(rowId);
+    try {
+        let streams = [];
+        if (type === 'live') {
+            streams = await xtreamAPI.getLiveStreams(profile.server_url, profile.username, profile.password, categoryId);
+        } else if (type === 'vod') {
+            streams = await xtreamAPI.getVodStreams(profile.server_url, profile.username, profile.password, categoryId);
+        } else if (type === 'series') {
+            streams = await xtreamAPI.getSeriesStreams(profile.server_url, profile.username, profile.password, categoryId);
+        }
+        
+        if (!streams || streams.length === 0) {
+            slider.innerHTML = '<p style="padding: 20px; color: var(--text-secondary);">Yayın bulunamadı</p>';
+            return;
+        }
+
+        const displayStreams = streams.slice(0, 10);
+        let html = '';
+        
+        displayStreams.forEach(ch => {
+            const fallbackChar = ch.name.substring(0, 2).toUpperCase();
+            const logoUrl = ch.stream_icon || ch.cover || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
+            const streamId = ch.stream_id || ch.series_id;
+            const cardId = `xtream_${type}_${streamId}`;
+            
+            // Enrich details
+            ch.category_name = categoryName;
+            ch.category_id = categoryId;
+            
+            html += `
+                <div class="channel-card" id="card-${cardId}" onclick="sessionStorage.setItem('last_played_channel', '${cardId}'); sessionStorage.setItem('last_played_row', '${rowId}'); window.playXtreamStream('${cardId}', '${encodeURIComponent(JSON.stringify(ch))}')">
+                    <div class="card-img-container">
+                        <img src="${logoUrl}" alt="${ch.name}" loading="lazy" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}'">
+                        <div class="play-overlay"><i class="material-icons">play_circle_outline</i></div>
+                    </div>
+                    <div class="card-info">
+                        <h4>${ch.name}</h4>
+                    </div>
+                </div>
+            `;
+        });
+        
+        slider.innerHTML = html;
+
+        const lastPlayedId = sessionStorage.getItem('last_played_channel');
+        const lastPlayedRow = sessionStorage.getItem('last_played_row');
+        
+        if (lastPlayedRow === rowId && lastPlayedId) {
+            setTimeout(() => {
+                const sliderParent = document.getElementById(rowId)?.parentElement?.parentElement;
+                if (sliderParent) sliderParent.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                const card = document.getElementById(`card-${lastPlayedId}`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    card.style.boxShadow = '0 0 15px var(--accent-color)';
+                }
+            }, 100);
+        }
+    } catch(e) {
+        console.error(e);
+        slider.innerHTML = '<p style="padding: 20px; color: red;">Yüklenemedi</p>';
     }
 }

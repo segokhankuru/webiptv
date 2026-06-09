@@ -182,28 +182,53 @@ router.get('/sources', verifyToken, async (req, res) => {
 // POST a new source (profile)
 router.post('/sources', verifyToken, async (req, res) => {
     try {
-        const { name, m3u_url } = req.body;
-        if (!name || !m3u_url) {
-            return res.status(400).json({ error: 'Name and M3U URL are required' });
+        const { name, m3u_url, source_type, xtream_server, xtream_username, xtream_password } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({ error: 'Profile name is required' });
         }
-        
-        let info;
-        const columns = await db.getTableColumns('iptv_sources');
-        const hasName = columns.some(c => c.name === 'name');
-        
-        if (hasName) {
-            info = await db.prepare('INSERT INTO iptv_sources (user_id, name, server_url, m3u_url, channel_count) VALUES (?, ?, ?, ?, ?)')
-                .run(req.user.id, name, '', m3u_url, 0);
+
+        const type = source_type || 'm3u';
+
+        // Xtream için server+user+pass zorunlu, m3u için url zorunlu
+        if (type === 'xtream') {
+            if (!xtream_server || !xtream_username || !xtream_password) {
+                return res.status(400).json({ error: 'Xtream: server, username and password are required' });
+            }
         } else {
-            info = await db.prepare('INSERT INTO iptv_sources (user_id, server_url, m3u_url, channel_count) VALUES (?, ?, ?, ?)')
-                .run(req.user.id, '', m3u_url, 0);
+            if (!m3u_url) {
+                return res.status(400).json({ error: 'M3U URL is required' });
+            }
         }
-            
+
+        // source_type kolonu yoksa ekle (migration)
+        try {
+            await db.exec(`ALTER TABLE iptv_sources ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) DEFAULT 'm3u'`);
+        } catch (e) { /* kolonun zaten var olabileceği ihtimaline karşı */ }
+
+        const info = await db.prepare(
+            `INSERT INTO iptv_sources (user_id, name, source_type, server_url, username, password, m3u_url, channel_count)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+            req.user.id,
+            name,
+            type,
+            xtream_server || '',
+            xtream_username || '',
+            xtream_password || '',
+            m3u_url || null,
+            0
+        );
+
         res.status(201).json({
             success: true,
             id: info.lastInsertRowid,
             name,
-            m3u_url,
+            source_type: type,
+            server_url: xtream_server || '',
+            username: xtream_username || '',
+            password: xtream_password || '',
+            m3u_url: m3u_url || null,
             channel_count: 0
         });
     } catch (err) {

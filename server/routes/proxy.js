@@ -37,6 +37,44 @@ router.get('/m3u', async (req, res) => {
     }
 });
 
+/**
+ * Xtream Codes Player API Proxy (GET)
+ * Xtream player_api.php çağrılarını sunucu üzerinden proxyle.
+ * Kullanım: /api/proxy/xtream?server=http://...&username=U&password=P&action=get_live_categories
+ */
+router.get('/xtream', async (req, res) => {
+    try {
+        const { server, username, password, action, category_id, vod_id, series_id, stream_id } = req.query;
+        if (!server || !username || !password || !action) {
+            return res.status(400).json({ error: 'server, username, password, action are required' });
+        }
+
+        const apiUrl = new URL(`${server}/player_api.php`);
+        apiUrl.searchParams.set('username', username);
+        apiUrl.searchParams.set('password', password);
+        apiUrl.searchParams.set('action', action);
+        if (category_id) apiUrl.searchParams.set('category_id', category_id);
+        if (vod_id) apiUrl.searchParams.set('vod_id', vod_id);
+        if (series_id) apiUrl.searchParams.set('series_id', series_id);
+        if (stream_id) apiUrl.searchParams.set('stream_id', stream_id);
+
+        const response = await fetch(apiUrl.toString(), {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            signal: AbortSignal.timeout(15000)
+        });
+
+        if (!response.ok) throw new Error(`Xtream server returned ${response.status}`);
+        const data = await response.json();
+        res.json(data);
+    } catch (err) {
+        console.error('Xtream Proxy Error:', err.message);
+        res.status(500).json({ error: 'Xtream proxy failed: ' + err.message });
+    }
+});
+
+// Legacy POST endpoint (altyazı için kullanılıyor, korunuyor)
 router.post('/xtream', async (req, res) => {
     try {
         const { url, params } = req.body;
@@ -47,16 +85,19 @@ router.post('/xtream', async (req, res) => {
             Object.keys(params).forEach(key => urlObj.searchParams.append(key, params[key]));
         }
 
-        const response = await fetch(urlObj.toString());
+        const response = await fetch(urlObj.toString(), {
+            signal: AbortSignal.timeout(15000)
+        });
         if (!response.ok) throw new Error(`Failed to fetch from target: ${response.status}`);
 
         const data = await response.json();
         res.json(data);
     } catch (err) {
-        console.error('Xtream Proxy Error:', err.message);
+        console.error('Xtream POST Proxy Error:', err.message);
         res.status(500).json({ error: 'Xtream proxy fetch failed' });
     }
 });
+
 
 /**
  * Stream Proxy — HTTP stream URL'lerini HTTPS üzerinden iletir.

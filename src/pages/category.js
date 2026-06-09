@@ -1,9 +1,20 @@
 import { apiClient } from '../services/api-client.js';
 import { channelDB } from '../services/channel-db.js';
+import { xtreamAPI } from '../services/xtream-api.js';
 
 export function renderCategory(categoryName) {
     const container = document.getElementById('app');
-    const decodedName = decodeURIComponent(categoryName);
+    
+    const isXtream = categoryName.startsWith('xtream_');
+    let decodedName, type, categoryId;
+    if (isXtream) {
+        const parts = categoryName.split('_');
+        type = parts[1];
+        categoryId = parts[2];
+        decodedName = decodeURIComponent(parts.slice(3).join('_'));
+    } else {
+        decodedName = decodeURIComponent(categoryName);
+    }
     
     container.innerHTML = `
         <div class="netflix-layout">
@@ -37,7 +48,6 @@ export function renderCategory(categoryName) {
                 <a href="#/profiles" style="color: #FFC107;">🔄 Profil Değiştir</a>
             </div>
 
-            
             <div style="padding: 100px 4% 50px 4%;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px;">
                     <div style="display: flex; align-items: center; gap: 15px;">
@@ -78,7 +88,6 @@ export function renderCategory(categoryName) {
         });
     }
 
-
     async function loadMore() {
         if (isFetching || !hasMore) return;
         isFetching = true;
@@ -90,54 +99,122 @@ export function renderCategory(categoryName) {
         }
 
         try {
-            const res = await channelDB.getChannelsByCategory(sourceId, decodedName, page, 50);
-            
-            document.getElementById('initial-loading')?.remove();
-            
-            if (page === 1) {
-                document.getElementById('total-badge').innerText = `${res.total} Kanal`;
-                if (res.data.length === 0) {
-                    grid.innerHTML = '<p style="color: var(--text-secondary); width: 100%; text-align: center; padding: 50px;">Bu kategoride kanal bulunamadı.</p>';
-                    return;
-                }
-            }
-
-            let html = '';
-            for (const ch of res.data) {
-                let resBadge = '';
-                if (ch.resolution && ch.resolution.trim() !== '') {
-                    let badgeClass = 'res-badge';
-                    if (ch.resolution === '4K') badgeClass += ' 4k';
-                    else if (ch.resolution === 'FHD') badgeClass += ' fhd';
-                    else if (ch.resolution === 'HD') badgeClass += ' hd';
-                    else badgeClass += ' sd';
-                    resBadge = `<span class="${badgeClass}">${ch.resolution}</span>`;
+            if (isXtream) {
+                // Xtream pagination logic
+                if (page === 1 && !window.__categoryStreamsCache) {
+                    const profile = xtreamAPI.getActiveXtreamProfile();
+                    if (!profile) throw new Error('Xtream profil bilgileri bulunamadı.');
+                    
+                    let streams = [];
+                    if (type === 'live') {
+                        streams = await xtreamAPI.getLiveStreams(profile.server_url, profile.username, profile.password, categoryId);
+                    } else if (type === 'vod') {
+                        streams = await xtreamAPI.getVodStreams(profile.server_url, profile.username, profile.password, categoryId);
+                    } else if (type === 'series') {
+                        streams = await xtreamAPI.getSeriesStreams(profile.server_url, profile.username, profile.password, categoryId);
+                    }
+                    
+                    window.__categoryStreamsCache = streams || [];
                 }
                 
-                const fallbackChar = ch.name.substring(0, 2).toUpperCase();
-                const logoUrl = ch.logo || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
+                const categoryStreams = window.__categoryStreamsCache || [];
+                document.getElementById('initial-loading')?.remove();
+                
+                if (page === 1) {
+                    document.getElementById('total-badge').innerText = `${categoryStreams.length} Yayın`;
+                    if (categoryStreams.length === 0) {
+                        grid.innerHTML = '<p style="color: var(--text-secondary); width: 100%; text-align: center; padding: 50px;">Bu kategoride yayın bulunamadı.</p>';
+                        return;
+                    }
+                }
 
-                html += `
-                    <div class="channel-card" style="margin-bottom: 15px;" onclick="window.location.hash='#/player/${ch.id}'">
-                        <div class="card-img-container">
-                            <img src="${logoUrl}" alt="${ch.name}" loading="lazy" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}'">
-                            ${resBadge}
-                            <div class="play-overlay"><i class="material-icons">play_circle_outline</i></div>
+                const pageSize = 50;
+                const startIdx = (page - 1) * pageSize;
+                const endIdx = page * pageSize;
+                const pageData = categoryStreams.slice(startIdx, endIdx);
+
+                let html = '';
+                for (const ch of pageData) {
+                    const fallbackChar = ch.name.substring(0, 2).toUpperCase();
+                    const logoUrl = ch.stream_icon || ch.cover || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
+                    const streamId = ch.stream_id || ch.series_id;
+                    const cardId = `xtream_${type}_${streamId}`;
+                    
+                    ch.category_name = decodedName;
+                    ch.category_id = categoryId;
+
+                    html += `
+                        <div class="channel-card" style="margin-bottom: 15px;" onclick="window.playXtreamStream('${cardId}', '${encodeURIComponent(JSON.stringify(ch))}')">
+                            <div class="card-img-container">
+                                <img src="${logoUrl}" alt="${ch.name}" loading="lazy" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}'">
+                                <div class="play-overlay"><i class="material-icons">play_circle_outline</i></div>
+                            </div>
+                            <div class="card-info">
+                                <h4>${ch.name}</h4>
+                            </div>
                         </div>
-                        <div class="card-info">
-                            <h4>${ch.name}</h4>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            grid.insertAdjacentHTML('beforeend', html);
-            
-            if (page >= res.totalPages) {
-                hasMore = false;
-                sentinel.innerHTML = '<p style="text-align: center; color: var(--text-secondary); font-size: 12px;">Tüm kanallar yüklendi</p>';
+                    `;
+                }
+                
+                grid.insertAdjacentHTML('beforeend', html);
+                
+                if (endIdx >= categoryStreams.length) {
+                    hasMore = false;
+                    sentinel.innerHTML = '<p style="text-align: center; color: var(--text-secondary); font-size: 12px;">Tüm yayınlar yüklendi</p>';
+                } else {
+                    page++;
+                }
             } else {
-                page++;
+                // Standard M3U pagination logic
+                const res = await channelDB.getChannelsByCategory(sourceId, decodedName, page, 50);
+                
+                document.getElementById('initial-loading')?.remove();
+                
+                if (page === 1) {
+                    document.getElementById('total-badge').innerText = `${res.total} Kanal`;
+                    if (res.data.length === 0) {
+                        grid.innerHTML = '<p style="color: var(--text-secondary); width: 100%; text-align: center; padding: 50px;">Bu kategoride kanal bulunamadı.</p>';
+                        return;
+                    }
+                }
+
+                let html = '';
+                for (const ch of res.data) {
+                    let resBadge = '';
+                    if (ch.resolution && ch.resolution.trim() !== '') {
+                        let badgeClass = 'res-badge';
+                        if (ch.resolution === '4K') badgeClass += ' 4k';
+                        else if (ch.resolution === 'FHD') badgeClass += ' fhd';
+                        else if (ch.resolution === 'HD') badgeClass += ' hd';
+                        else badgeClass += ' sd';
+                        resBadge = `<span class="${badgeClass}">${ch.resolution}</span>`;
+                    }
+                    
+                    const fallbackChar = ch.name.substring(0, 2).toUpperCase();
+                    const logoUrl = ch.logo || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
+
+                    html += `
+                        <div class="channel-card" style="margin-bottom: 15px;" onclick="window.location.hash='#/player/${ch.id}'">
+                            <div class="card-img-container">
+                                <img src="${logoUrl}" alt="${ch.name}" loading="lazy" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}'">
+                                ${resBadge}
+                                <div class="play-overlay"><i class="material-icons">play_circle_outline</i></div>
+                            </div>
+                            <div class="card-info">
+                                <h4>${ch.name}</h4>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                grid.insertAdjacentHTML('beforeend', html);
+                
+                if (page >= res.totalPages) {
+                    hasMore = false;
+                    sentinel.innerHTML = '<p style="text-align: center; color: var(--text-secondary); font-size: 12px;">Tüm kanallar yüklendi</p>';
+                } else {
+                    page++;
+                }
             }
             
         } catch(err) {
@@ -160,5 +237,6 @@ export function renderCategory(categoryName) {
     // Router tarafından sayfa değişiminde çağrılır
     window.__currentPageCleanup = function() {
         observer.disconnect();
+        window.__categoryStreamsCache = null;
     };
 }
