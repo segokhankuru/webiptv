@@ -566,7 +566,7 @@ export async function renderPlayer(channelId) {
                     
                     <div style="background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; text-align: left; font-size: 12px; margin-bottom: 15px; border-left: 4px solid #FFC107;">
                         <h4 style="margin: 0 0 6px 0; color: #FFC107; font-weight: 600;">Yayını İzlemek İçin:</h4>
-                        \${isMobile ? `
+                        ${isMobile ? `
                         <ol style="margin: 0; padding-left: 15px; line-height: 1.5; color: #ccc;">
                             <li>Adres çubuğunun solundaki <b>kilit/ayar</b> simgesine dokunun.</li>
                             <li><b>Site Ayarları (Site Settings)</b> seçeneğine girin.</li>
@@ -587,11 +587,11 @@ export async function renderPlayer(channelId) {
                         <button onclick="window.location.reload()" style="background: #e50914; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 12px; transition: background 0.2s;" onmouseover="this.style.background='#b80710'" onmouseout="this.style.background='#e50914'">
                             İzni Verdim, Sayfayı Yenile
                         </button>
-                        <a href="vlc://\${rawUrl}" style="background: #FF5722; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: background 0.2s;" onmouseover="this.style.background='#E64A19'" onmouseout="this.style.background='#FF5722'">
+                        <a href="vlc://${rawUrl}" style="background: #FF5722; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: background 0.2s;" onmouseover="this.style.background='#E64A19'" onmouseout="this.style.background='#FF5722'">
                             🍊 VLC Player ile Aç
                         </a>
-                        \${isMobile ? `
-                        <a href="\${mxPlayerUrl}" style="background: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: background 0.2s;" onmouseover="this.style.background='#1976D2'" onmouseout="this.style.background='#2196F3'">
+                        ${isMobile ? `
+                        <a href="${mxPlayerUrl}" style="background: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: background 0.2s;" onmouseover="this.style.background='#1976D2'" onmouseout="this.style.background='#2196F3'">
                             🔷 MX Player ile Aç
                         </a>
                         ` : ''}
