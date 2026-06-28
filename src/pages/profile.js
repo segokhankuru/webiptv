@@ -88,6 +88,22 @@ export async function renderProfile() {
                                 <option value="forest" ${freshUser.theme === 'forest' ? 'selected' : ''}>🌲 Orman (Yeşil)</option>
                             </select>
                         </div>
+
+                        <div style="margin-top: 30px;">
+                            <h3 style="font-size: 16px; color: var(--text-secondary); margin-bottom: 15px;">İçerik Tercihleri</h3>
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-secondary); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div>
+                                    <span style="font-size: 14px; font-weight: 600;">🔞 Yetişkin İçerik</span>
+                                    <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-secondary);">Adult (18+) kanalları ve kategorileri göster</p>
+                                </div>
+                                <label style="position: relative; display: inline-block; width: 50px; height: 26px; cursor: pointer;">
+                                    <input type="checkbox" id="adult-toggle" style="opacity: 0; width: 0; height: 0;"
+                                        ${localStorage.getItem('iptv_allow_adult') === 'true' ? 'checked' : ''}>
+                                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: 0.3s; border-radius: 26px;"></span>
+                                    <span id="adult-toggle-knob" style="position: absolute; content: ''; height: 20px; width: 20px; left: ${localStorage.getItem('iptv_allow_adult') === 'true' ? '27px' : '3px'}; bottom: 3px; background-color: white; transition: 0.3s; border-radius: 50%; z-index: 1;"></span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Subscription Info -->
@@ -141,6 +157,25 @@ export async function renderProfile() {
             alert('Tema güncellenemedi: ' + err.message);
         }
     });
+
+    // Adult Content Toggle Handler
+    const adultToggle = document.getElementById('adult-toggle');
+    const adultKnob = document.getElementById('adult-toggle-knob');
+    if (adultToggle) {
+        adultToggle.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            localStorage.setItem('iptv_allow_adult', isChecked ? 'true' : 'false');
+            
+            // Toggle görselini güncelle
+            const track = adultToggle.nextElementSibling;
+            if (adultKnob) {
+                adultKnob.style.left = isChecked ? '27px' : '3px';
+            }
+            if (track) {
+                track.style.backgroundColor = isChecked ? '#e50914' : '#444';
+            }
+        });
+    }
 
     // Upgrade Handler
     const upgradeBtn = document.getElementById('upgrade-btn');

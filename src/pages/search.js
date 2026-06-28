@@ -81,7 +81,28 @@ export function renderSearch() {
                         }
 
                         const queryLower = query.toLowerCase();
-                        const results = window.__xtreamSearchCache.streams.filter(s => s.name && s.name.toLowerCase().includes(queryLower)).slice(0, 50);
+                        const allowAdult = localStorage.getItem('iptv_allow_adult') === 'true';
+                        
+                        const ADULT_KEYWORDS = [
+                            'xxx', 'adult', 'porn', '18+', 'erotic', 'sex', 'yetişkin',
+                            'brazzers', 'bangbros', 'onlyfans', 'hustler', 'playboy',
+                            'penthouse', 'gonzo', 'perfectgonzo', 'fakehostel', 'faketaxi',
+                            'evil angel', 'evilangel', 'nubile', 'tushy', 'hardx',
+                            'ddfnetwork', 'redlight', 'dorcel', 'vivid', 'private hd',
+                            'mofos', 'realitykings', 'julesjourdan', 'swallowed', 'legalporno',
+                            'legal porno', 'pink erotic', 'passionxxx', 'hot tv live'
+                        ];
+
+                        let results = window.__xtreamSearchCache.streams.filter(s => s.name && s.name.toLowerCase().includes(queryLower));
+
+                        if (!allowAdult) {
+                            results = results.filter(s => {
+                                const nameLower = (s.name || '').toLowerCase();
+                                return !ADULT_KEYWORDS.some(kw => nameLower.includes(kw));
+                            });
+                        }
+
+                        results = results.slice(0, 50);
 
                         if (results.length === 0) {
                             resultsContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; font-size: 18px; margin-top: 40px;">Maalesef sonuç bulunamadı.</p>';

@@ -114,6 +114,24 @@ export function renderCategory(categoryName) {
                         streams = await xtreamAPI.getSeriesStreams(profile.server_url, profile.username, profile.password, categoryId);
                     }
                     
+                    // Adult content filter for Xtream categories
+                    const allowAdult = localStorage.getItem('iptv_allow_adult') === 'true';
+                    if (!allowAdult) {
+                        const ADULT_KEYWORDS = [
+                            'xxx', 'adult', 'porn', '18+', 'erotic', 'sex', 'yetişkin',
+                            'brazzers', 'bangbros', 'onlyfans', 'hustler', 'playboy',
+                            'penthouse', 'gonzo', 'perfectgonzo', 'fakehostel', 'faketaxi',
+                            'evil angel', 'evilangel', 'nubile', 'tushy', 'hardx',
+                            'ddfnetwork', 'redlight', 'dorcel', 'vivid', 'private hd',
+                            'mofos', 'realitykings', 'julesjourdan', 'swallowed', 'legalporno',
+                            'legal porno', 'pink erotic', 'passionxxx', 'hot tv live'
+                        ];
+                        streams = (streams || []).filter(s => {
+                            const nameLower = (s.name || '').toLowerCase();
+                            return !ADULT_KEYWORDS.some(kw => nameLower.includes(kw));
+                        });
+                    }
+                    
                     window.__categoryStreamsCache = streams || [];
                 }
                 

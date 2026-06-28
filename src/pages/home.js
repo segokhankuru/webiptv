@@ -111,10 +111,23 @@ export async function renderHome() {
 
         const catContainer = document.getElementById('categories-container');
 
+        // Adult filtre kontrolü
+        const allowAdult = localStorage.getItem('iptv_allow_adult') === 'true';
+        const ADULT_KEYWORDS_HOME = ['xxx', 'adult', 'porn', '18+', 'erotic', 'sex', 'yetişkin', '🔞'];
+        const isAdultCategory = (catName) => {
+            const lower = (catName || '').toLowerCase();
+            return ADULT_KEYWORDS_HOME.some(kw => lower.includes(kw));
+        };
+
         if (xtreamAPI.isXtreamProfile()) {
             // Xtream Codes profile handling
             const profile = xtreamAPI.getActiveXtreamProfile();
-            const categories = await xtreamAPI.getAllCategories(profile.server_url, profile.username, profile.password);
+            let categories = await xtreamAPI.getAllCategories(profile.server_url, profile.username, profile.password);
+            
+            // Xtream kategorilerde adult filtreleme
+            if (!allowAdult) {
+                categories = categories.filter(cat => !isAdultCategory(cat.category_name));
+            }
             
             catContainer.innerHTML = ''; // clear loading
 

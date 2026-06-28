@@ -526,8 +526,14 @@ export async function renderPlayer(channelId) {
 
         let warningTimeout = null;
 
+        const dismissMixedContentWarning = () => {
+            sessionStorage.setItem('mixed_content_dismissed', 'true');
+            clearMixedContentWarning();
+        };
+
         const showMixedContentWarning = () => {
             if (document.getElementById('mixed-content-warning')) return;
+            if (sessionStorage.getItem('mixed_content_dismissed') === 'true') return;
             
             const videoWrapper = document.getElementById('video-wrapper');
             if (!videoWrapper) return;
@@ -557,7 +563,8 @@ export async function renderPlayer(channelId) {
             const mxPlayerUrl = `intent://${rawUrl.replace(/^https?:\/\//, '')}#Intent;scheme=http;package=com.mxtech.videoplayer.ad;end`;
 
             warningOverlay.innerHTML = `
-                <div style="max-width: 480px; background: rgba(30, 30, 30, 0.7); padding: 25px; border-radius: 16px; border: 1px solid rgba(229, 9, 20, 0.4); box-shadow: 0 8px 32px rgba(0,0,0,0.8); backdrop-filter: blur(10px); margin: 10px;">
+                <div style="max-width: 480px; background: rgba(30, 30, 30, 0.7); padding: 25px; border-radius: 16px; border: 1px solid rgba(229, 9, 20, 0.4); box-shadow: 0 8px 32px rgba(0,0,0,0.8); backdrop-filter: blur(10px); margin: 10px; position: relative;">
+                    <button id="mixed-content-close-btn" style="position: absolute; top: 10px; right: 14px; background: none; border: none; color: #888; font-size: 22px; cursor: pointer; padding: 0; line-height: 1; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#888'">✕</button>
                     <div style="font-size: 40px; margin-bottom: 10px;">⚠️</div>
                     <h2 style="margin: 0 0 10px 0; font-size: 1.15rem; font-weight: 700; color: #ff3333; letter-spacing: 0.5px;">Tarayıcı Güvenlik Engeli (Karışık İçerik)</h2>
                     <p style="font-size: 13px; line-height: 1.5; color: #e0e0e0; margin: 0 0 15px 0;">
@@ -599,6 +606,15 @@ export async function renderPlayer(channelId) {
                 </div>
             `;
             videoWrapper.appendChild(warningOverlay);
+
+            // X butonuna event listener ekle
+            const closeBtn = document.getElementById('mixed-content-close-btn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    dismissMixedContentWarning();
+                });
+            }
         };
 
         const clearMixedContentWarning = () => {
@@ -611,8 +627,10 @@ export async function renderPlayer(channelId) {
         };
 
         if (isHttpsPage && isHttpStream) {
-            // 2.5 saniye içinde yayın başlamazsa uyarıyı göster
-            warningTimeout = setTimeout(showMixedContentWarning, 2500);
+            // Daha önce kapatıldıysa tekrar gösterme
+            if (sessionStorage.getItem('mixed_content_dismissed') !== 'true') {
+                warningTimeout = setTimeout(showMixedContentWarning, 2500);
+            }
         }
 
         /**

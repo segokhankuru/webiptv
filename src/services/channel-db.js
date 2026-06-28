@@ -6,7 +6,7 @@
  */
 
 const DB_NAME = 'webiptv-channels';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'channels';
 
 let _db = null;
@@ -23,9 +23,11 @@ function openDB() {
 
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
+            const oldVersion = event.oldVersion;
 
+            let store;
             if (!db.objectStoreNames.contains(STORE_NAME)) {
-                const store = db.createObjectStore(STORE_NAME, {
+                store = db.createObjectStore(STORE_NAME, {
                     keyPath: 'id',
                     autoIncrement: true
                 });
@@ -38,6 +40,15 @@ function openDB() {
 
                 // İsim bazlı arama: [sourceId, name]
                 store.createIndex('sourceName', ['sourceId', 'name'], { unique: false });
+            } else {
+                store = event.target.transaction.objectStore(STORE_NAME);
+            }
+
+            // V2: isAdult index'i ekle
+            if (oldVersion < 2) {
+                if (!store.indexNames.contains('sourceAdult')) {
+                    store.createIndex('sourceAdult', ['sourceId', 'isAdult'], { unique: false });
+                }
             }
         };
 
@@ -94,7 +105,8 @@ async function saveChannels(sourceId, channels, onProgress) {
                 logo: logo,
                 streamUrl: ch.streamUrl,
                 resolution: ch.resolution || 'SD',
-                country: ch.country || null
+                country: ch.country || null,
+                isAdult: ch.isAdult || false
             };
 
             const req = store.add(record);
@@ -124,9 +136,12 @@ async function saveChannels(sourceId, channels, onProgress) {
  * @param {number|string} sourceId
  * @returns {Promise<Array<{category: string, count: number}>>}
  */
-async function getCategories(sourceId) {
+async function getCategories(sourceId, includeAdult = null) {
     const db = await openDB();
     const sid = Number(sourceId);
+    
+    // includeAdult null ise localStorage'dan oku
+    const allowAdult = includeAdult !== null ? includeAdult : (localStorage.getItem('iptv_allow_adult') === 'true');
 
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
@@ -141,7 +156,15 @@ async function getCategories(sourceId) {
         req.onsuccess = (event) => {
             const cursor = event.target.result;
             if (cursor) {
-                const cat = cursor.value.category || 'Genel';
+                const record = cursor.value;
+                const cat = record.category || 'Genel';
+                
+                // Adult filtresi: izin yoksa adult kanalları sayma
+                if (!allowAdult && record.isAdult) {
+                    cursor.continue();
+                    return;
+                }
+                
                 categories[cat] = (categories[cat] || 0) + 1;
                 cursor.continue();
             } else {
@@ -169,6 +192,7 @@ async function getCategories(sourceId) {
 async function getChannelsByCategory(sourceId, category, page = 1, limit = 50) {
     const db = await openDB();
     const sid = Number(sourceId);
+    const allowAdult = localStorage.getItem('iptv_allow_adult') === 'true';
 
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
@@ -181,36 +205,39 @@ async function getChannelsByCategory(sourceId, category, page = 1, limit = 50) {
         const offset = (page - 1) * limit;
         let skipped = 0;
 
-        const countReq = index.count(range);
-        countReq.onsuccess = () => {
-            total = countReq.result;
+        // Adult filtre varsa count'u manuel saymalıyız
+        const cursorReq = index.openCursor(range);
+        let counting = true;
+        let allFiltered = [];
 
-            const cursorReq = index.openCursor(range);
-            cursorReq.onsuccess = (event) => {
-                const cursor = event.target.result;
-                if (!cursor || results.length >= limit) {
-                    resolve({
-                        data: results,
-                        total,
-                        page,
-                        totalPages: Math.ceil(total / limit)
-                    });
-                    return;
-                }
+        cursorReq.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (!cursor) {
+                // Tüm kayıtları aldık, şimdi sayfalama yap
+                total = allFiltered.length;
+                const paged = allFiltered.slice(offset, offset + limit);
+                resolve({
+                    data: paged,
+                    total,
+                    page,
+                    totalPages: Math.ceil(total / limit)
+                });
+                return;
+            }
 
-                if (skipped < offset) {
-                    skipped++;
-                    cursor.continue();
-                } else {
-                    results.push(cursor.value);
-                    cursor.continue();
-                }
-            };
+            const record = cursor.value;
+            
+            // Adult filtresi
+            if (!allowAdult && record.isAdult) {
+                cursor.continue();
+                return;
+            }
 
-            cursorReq.onerror = (event) => reject(event.target.error);
+            allFiltered.push(record);
+            cursor.continue();
         };
 
-        countReq.onerror = (event) => reject(event.target.error);
+        cursorReq.onerror = (event) => reject(event.target.error);
     });
 }
 
@@ -226,6 +253,7 @@ async function searchChannels(sourceId, query, limit = 50) {
     const db = await openDB();
     const sid = Number(sourceId);
     const lowerQuery = query.toLowerCase();
+    const allowAdult = localStorage.getItem('iptv_allow_adult') === 'true';
 
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
@@ -243,8 +271,16 @@ async function searchChannels(sourceId, query, limit = 50) {
                 return;
             }
 
-            if (cursor.value.name.toLowerCase().includes(lowerQuery)) {
-                results.push(cursor.value);
+            const record = cursor.value;
+            
+            // Adult filtresi
+            if (!allowAdult && record.isAdult) {
+                cursor.continue();
+                return;
+            }
+
+            if (record.name.toLowerCase().includes(lowerQuery)) {
+                results.push(record);
             }
             cursor.continue();
         };
