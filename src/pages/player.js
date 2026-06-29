@@ -518,119 +518,10 @@ export async function renderPlayer(channelId) {
 
         const rawUrl = channel.streamUrl;
         
-        // Video akışlarını sunucudan kesinlikle geçirmiyoruz (doğrudan client bağlantısı)
-        const playUrl = rawUrl;
-
-        const isHttpsPage = window.location.protocol === 'https:';
-        const isHttpStream = rawUrl.startsWith('http://');
-
-        let warningTimeout = null;
-
-        const dismissMixedContentWarning = () => {
-            sessionStorage.setItem('mixed_content_dismissed', 'true');
-            clearMixedContentWarning();
-        };
-
-        const showMixedContentWarning = () => {
-            if (document.getElementById('mixed-content-warning')) return;
-            if (sessionStorage.getItem('mixed_content_dismissed') === 'true') return;
-            
-            const videoWrapper = document.getElementById('video-wrapper');
-            if (!videoWrapper) return;
-
-            const warningOverlay = document.createElement('div');
-            warningOverlay.id = 'mixed-content-warning';
-            warningOverlay.style.cssText = `
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(15, 15, 15, 0.95);
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                z-index: 30;
-                color: #fff;
-                font-family: 'Inter', 'Roboto', sans-serif;
-                padding: 20px;
-                box-sizing: border-box;
-                text-align: center;
-            `;
-
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const mxPlayerUrl = `intent://${rawUrl.replace(/^https?:\/\//, '')}#Intent;scheme=http;package=com.mxtech.videoplayer.ad;end`;
-
-            warningOverlay.innerHTML = `
-                <div style="max-width: 480px; background: rgba(30, 30, 30, 0.7); padding: 25px; border-radius: 16px; border: 1px solid rgba(229, 9, 20, 0.4); box-shadow: 0 8px 32px rgba(0,0,0,0.8); backdrop-filter: blur(10px); margin: 10px; position: relative;">
-                    <button id="mixed-content-close-btn" style="position: absolute; top: 10px; right: 14px; background: none; border: none; color: #888; font-size: 22px; cursor: pointer; padding: 0; line-height: 1; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#888'">✕</button>
-                    <div style="font-size: 40px; margin-bottom: 10px;">⚠️</div>
-                    <h2 style="margin: 0 0 10px 0; font-size: 1.15rem; font-weight: 700; color: #ff3333; letter-spacing: 0.5px;">Tarayıcı Güvenlik Engeli (Karışık İçerik)</h2>
-                    <p style="font-size: 13px; line-height: 1.5; color: #e0e0e0; margin: 0 0 15px 0;">
-                        Bu yayın şifresiz <strong>HTTP</strong> bağlantısı kullanıyor. Güvenli sitemiz (HTTPS) üzerinden tarayıcı kısıtlaması nedeniyle doğrudan oynatılamaz.
-                    </p>
-                    
-                    <div style="background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; text-align: left; font-size: 12px; margin-bottom: 15px; border-left: 4px solid #FFC107;">
-                        <h4 style="margin: 0 0 6px 0; color: #FFC107; font-weight: 600;">Yayını İzlemek İçin:</h4>
-                        ${isMobile ? `
-                        <ol style="margin: 0; padding-left: 15px; line-height: 1.5; color: #ccc;">
-                            <li>Adres çubuğunun solundaki <b>kilit/ayar</b> simgesine dokunun.</li>
-                            <li><b>Site Ayarları (Site Settings)</b> seçeneğine girin.</li>
-                            <li><b>Güvensiz İçerik (Insecure Content)</b> ayarını bulup <b>İzin Ver (Allow)</b> yapın.</li>
-                            <li>Sayfayı yenileyerek izleyin.</li>
-                        </ol>
-                        ` : `
-                        <ol style="margin: 0; padding-left: 15px; line-height: 1.5; color: #ccc;">
-                            <li>Adres çubuğundaki kilit simgesine tıklayın.</li>
-                            <li><b>Site Ayarları (Site Settings)</b> seçeneğine girin.</li>
-                            <li><b>Güvensiz İçerik (Insecure Content)</b> ayarını <b>İzin Ver (Allow)</b> yapın.</li>
-                            <li>Bu sayfayı yenileyerek izleyin.</li>
-                        </ol>
-                        `}
-                    </div>
-
-                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                        <button onclick="window.location.reload()" style="background: #e50914; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 12px; transition: background 0.2s;" onmouseover="this.style.background='#b80710'" onmouseout="this.style.background='#e50914'">
-                            İzni Verdim, Sayfayı Yenile
-                        </button>
-                        <a href="vlc://${rawUrl}" style="background: #FF5722; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: background 0.2s;" onmouseover="this.style.background='#E64A19'" onmouseout="this.style.background='#FF5722'">
-                            🍊 VLC Player ile Aç
-                        </a>
-                        ${isMobile ? `
-                        <a href="${mxPlayerUrl}" style="background: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: background 0.2s;" onmouseover="this.style.background='#1976D2'" onmouseout="this.style.background='#2196F3'">
-                            🔷 MX Player ile Aç
-                        </a>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-            videoWrapper.appendChild(warningOverlay);
-
-            // X butonuna event listener ekle
-            const closeBtn = document.getElementById('mixed-content-close-btn');
-            if (closeBtn) {
-                closeBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    dismissMixedContentWarning();
-                });
-            }
-        };
-
-        const clearMixedContentWarning = () => {
-            if (warningTimeout) {
-                clearTimeout(warningTimeout);
-                warningTimeout = null;
-            }
-            const warningOverlay = document.getElementById('mixed-content-warning');
-            if (warningOverlay) warningOverlay.remove();
-        };
-
-        if (isHttpsPage && isHttpStream) {
-            // Daha önce kapatıldıysa tekrar gösterme
-            if (sessionStorage.getItem('mixed_content_dismissed') !== 'true') {
-                warningTimeout = setTimeout(showMixedContentWarning, 2500);
-            }
+        // HTTP yayınları Cloudflare Worker üzerinden HTTPS proxy yaparak oynatıyoruz
+        let playUrl = rawUrl;
+        if (rawUrl && rawUrl.startsWith('http://')) {
+            playUrl = `https://webiptv.se-gokhankuru.workers.dev/?url=${encodeURIComponent(rawUrl)}`;
         }
 
         /**
@@ -880,7 +771,6 @@ export async function renderPlayer(channelId) {
             };
 
             video.addEventListener('loadedmetadata', () => {
-                clearMixedContentWarning();
                 video.play().catch(() => {
                     playPauseBtn.innerHTML = icons.play;
                 });
@@ -958,14 +848,10 @@ export async function renderPlayer(channelId) {
                 const codes = { 1: 'Kullanıcı iptal etti', 2: 'Ağ hatası', 3: 'Decode hatası', 4: 'Desteklenmeyen format' };
                 const msg = codes[video.error?.code] || 'Bilinmeyen hata';
                 showToast(`Video yüklenemedi: ${msg}`);
-                if (isHttpsPage && isHttpStream) {
-                    showMixedContentWarning();
-                }
             });
 
             // Cleanup: Router tarafından sayfa değişiminde çağrılır
             window.__currentPageCleanup = function() {
-                clearMixedContentWarning();
                 isReading = false;
                 if (reader) reader.cancel();
             };
@@ -977,7 +863,6 @@ export async function renderPlayer(channelId) {
             hls.attachMedia(video);
             
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                clearMixedContentWarning();
                 video.play().catch(e => {
                     console.log('Otomatik oynatma engellendi');
                     playPauseBtn.innerHTML = icons.play;
@@ -1026,15 +911,11 @@ export async function renderPlayer(channelId) {
                 if (data.fatal) {
                     showToast('Yayın yüklenemedi. Bağlantı hatası.');
                     playPauseBtn.innerHTML = icons.play;
-                    if (isHttpsPage && isHttpStream) {
-                        showMixedContentWarning();
-                    }
                 }
             });
             
             // Cleanup: Router tarafından sayfa değişiminde çağrılır
             window.__currentPageCleanup = function() {
-                clearMixedContentWarning();
                 if (hls) {
                     hls.destroy();
                     hls = null;
@@ -1045,7 +926,6 @@ export async function renderPlayer(channelId) {
             // Safari native HLS
             video.src = playUrl;
             video.addEventListener('loadedmetadata', () => {
-                clearMixedContentWarning();
                 video.play();
             });
         }

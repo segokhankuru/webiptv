@@ -114,10 +114,11 @@ function parseM3u(text) {
                 let category = null;
                 let name = fullName;
 
-                // 1. group-title attribute'u varsa onu kullan
-                const groupMatch = currentInfo.match(/group-title="([^"]+)"/);
+                // 1. group-title attribute'u varsa onu kullan (boş tırnaklar için "Diğer" yapar)
+                const groupMatch = currentInfo.match(/group-title="([^"]*)"/);
                 if (groupMatch) {
-                    category = groupMatch[1];
+                    const categoryRaw = groupMatch[1].trim();
+                    category = categoryRaw === "" ? "Diğer" : categoryRaw;
                 }
 
                 // 2. Kanal adı prefix'i varsa (XX: veya XXX:)
@@ -146,9 +147,9 @@ function parseM3u(text) {
                     category = 'Diziler';
                 }
 
-                // 5. Hiçbirine uymadıysa Genel
+                // 5. Hiçbirine uymadıysa Diğer
                 if (!category) {
-                    category = 'Genel';
+                    category = 'Diğer';
                 }
 
                 const logoMatch = currentInfo.match(/tvg-logo="([^"]+)"/);
