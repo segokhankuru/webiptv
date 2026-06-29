@@ -62,14 +62,24 @@ export const apiClient = {
     async proxyM3u(url) {
         let response;
         try {
-            // Önce iptv.html'deki gibi doğrudan (çok hızlı) indirmeyi deneriz
+            // Önce doğrudan çekmeyi deneriz (aynı origin veya CORS izinliyse hızlıca)
             response = await fetch(url);
         } catch (e) {
-            console.warn('Direct fetch failed (CORS), falling back to proxy...');
+            console.warn('Direct fetch failed (CORS), trying Cloudflare Worker proxy...');
         }
         
         if (!response || !response.ok) {
-            // CORS veya başka hata varsa arka plan proxy'mize başvururuz
+            // Doğrudan çekilemediyse Cloudflare Worker proxy'sine yönlendiririz (Mixed Content ve Vercel limitlerini aşmak için)
+            const cfProxyUrl = `https://webiptv.se-gokhankuru.workers.dev/?url=${encodeURIComponent(url)}`;
+            try {
+                response = await fetch(cfProxyUrl);
+            } catch (err) {
+                console.warn('Cloudflare Worker proxy failed, falling back to local backend proxy...');
+            }
+        }
+
+        if (!response || !response.ok) {
+            // En son çare yerel Express backend proxy'sine düşeriz
             response = await fetch(`${API_BASE}/proxy/m3u?url=${encodeURIComponent(url)}`);
             if (!response.ok) throw new Error('M3U listesi indirilemedi.');
         }

@@ -42,7 +42,7 @@ export async function renderPlayer(channelId) {
                 <!-- Left: Video Player and Info -->
                 <div style="flex: 1; min-width: 60%;">
                     <div id="video-wrapper" style="width: 100%; aspect-ratio: 16/9; background: #000; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
-                        <video id="hls-video" style="width: 100%; height: 100%; outline: none; cursor: pointer;" autoplay playsinline webkit-playsinline x5-playsinline></video>
+                        <video id="hls-video" crossorigin="anonymous" style="width: 100%; height: 100%; outline: none; cursor: pointer;" autoplay playsinline webkit-playsinline x5-playsinline></video>
                         
                         <!-- Netflix Style Subtitle Overlay -->
                         <div id="subtitle-overlay" style="position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); text-align: center; color: white; font-size: 22px; font-weight: 500; text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 4px; pointer-events: none; z-index: 24; display: none; max-width: 85%; line-height: 1.4; font-family: 'Inter', 'Roboto', sans-serif; transition: all 0.1s;"></div>
