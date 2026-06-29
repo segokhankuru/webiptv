@@ -91,7 +91,7 @@ export async function renderFavorites() {
             const logoUrl = ch.logo_url || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}`;
 
             let onClickAttr = `window.location.hash='#/player/${ch.channel_id}'`;
-            if (ch.channel_id && ch.channel_id.startsWith('xtream_')) {
+            if (ch.channel_id && String(ch.channel_id).startsWith('xtream_')) {
                 const playObj = {
                     name: ch.name,
                     stream_icon: ch.logo_url,

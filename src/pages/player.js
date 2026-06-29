@@ -272,7 +272,7 @@ export async function renderPlayer(channelId) {
                             const rLogo = proxyLogoUrl(rc.logo) || `https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(rc.name.substring(0,2).toUpperCase())}`;
                             
                             let onClickAttr = `window.location.hash='#/player/${rc.id}'`;
-                            if (rc.id.startsWith('xtream_') && rc.raw) {
+                            if (String(rc.id).startsWith('xtream_') && rc.raw) {
                                 onClickAttr = `window.playXtreamStream('${rc.id}', '${encodeURIComponent(JSON.stringify(rc.raw))}')`;
                             }
                             
