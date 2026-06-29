@@ -521,7 +521,7 @@ export async function renderPlayer(channelId) {
         // HTTP yayınları Cloudflare Worker üzerinden HTTPS proxy yaparak oynatıyoruz
         let playUrl = rawUrl;
         if (rawUrl && rawUrl.startsWith('http://')) {
-            playUrl = `https://webiptv.se-gokhankuru.workers.dev/?url=${encodeURIComponent(rawUrl)}`;
+            playUrl = `https://webiptv.se-gokhankuru.workers.dev/http/${rawUrl.substring(7)}`;
         }
 
         /**
