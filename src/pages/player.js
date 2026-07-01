@@ -526,15 +526,19 @@ export async function renderPlayer(channelId) {
 
         /**
          * Format algılama:
-         * - .m3u8 → HLS.js ile oynat
-         * - .mkv, .mp4, .ts, .avi, .mov, .webm → native <video> ile oynat
-         * - Bilinmeyen → önce HLS.js dene, hata alırsa native'e düş
+         * - .m3u8 → HLS.js (zorunlu)
+         * - .mkv, .mp4, .avi, .mov, .webm → native video
+         * - Uzantısız (canlı TV, Xtream live) → HLS.js (varsayılan)
+         * - Bilinmeyen → HLS.js, hata alırsa native
          */
         const urlLower = rawUrl.toLowerCase().split('?')[0]; // query string'i çıkar
-        const isDirectVideo = /\\.(mkv|mp4|avi|mov|webm|flv|wmv|ogv|3gp|m4v|ts)$/.test(urlLower);
-        const isHls = urlLower.endsWith('.m3u8') || urlLower.includes('.m3u8?');
+        // Not: \. ile regex'teki nokta karakteri düzgün escape edildi (daha önce \\. idi ve hiç match etmiyordu)
+        const isDirectVideo = /\.(mkv|mp4|avi|mov|webm|flv|wmv|ogv|3gp|m4v)$/.test(urlLower);
+        const isHls = urlLower.endsWith('.m3u8') || urlLower.includes('.m3u8?') || urlLower.includes('/hls/');
+        // .ts uzantısı hem HLS segmenti hem de doğrudan video olabilir — HLS.js denesin
+        const isTsSegment = urlLower.endsWith('.ts');
 
-        if (isDirectVideo || (!isHls && !Hls.isSupported())) {
+        if (isDirectVideo) {
             // Native video player — MKV, MP4 ve diğer doğrudan dosyalar
             video.src = playUrl;
 
@@ -857,8 +861,16 @@ export async function renderPlayer(channelId) {
             };
 
         } else if (Hls.isSupported()) {
-            // HLS.js — .m3u8 stream'ler
-            hls = new Hls({ maxBufferLength: 30, enableWorker: true });
+            // HLS.js — m3u8, canlı TV, Xtream ve uzantısız/bilinmeyen tüm yayınlar
+            // (Canlı yayınlar genelde uzantısız olduğundan buraya gelir — native'e bırakılmamalı)
+            hls = new Hls({
+                maxBufferLength: 30,
+                enableWorker: true,
+                lowLatencyMode: false,
+                xhrSetup: function(xhr, url) {
+                    xhr.withCredentials = false;
+                }
+            });
             hls.loadSource(playUrl);
             hls.attachMedia(video);
             
