@@ -863,16 +863,40 @@ export async function renderPlayer(channelId) {
         } else if (Hls.isSupported()) {
             // HLS.js — m3u8, canlı TV, Xtream ve uzantısız/bilinmeyen tüm yayınlar
             // (Canlı yayınlar genelde uzantısız olduğundan buraya gelir — native'e bırakılmamalı)
+            const CF_WORKER = 'https://webiptv.se-gokhankuru.workers.dev';
+            // Orijinal sunucunun host:port bilgisi (segment URL'lerini düzeltmek için)
+            const originalHost = (() => {
+                try { return new URL(rawUrl).host; } catch(e) { return null; }
+            })();
+
             hls = new Hls({
                 maxBufferLength: 30,
                 enableWorker: true,
                 lowLatencyMode: false,
-                xhrSetup: function(xhr, url) {
-                    xhr.withCredentials = false;
+                fetchSetup: function(context, initParams) {
+                    let url = context.url;
+
+                    // Durum 1: Segment URL'si http:// → doğrudan proxy'ye gönder
+                    if (url.startsWith('http://')) {
+                        url = `${CF_WORKER}/http/${url.substring(7)}`;
+                    }
+                    // Durum 2: Segment URL'si worker domain'indedir ama /http/ veya /https/ prefiksi yoktur.
+                    // Bu, m3u8 içindeki kök-göreli (/path/segment.ts) URL'lerin
+                    // HLS.js tarafından yanlış çözümlenmesinden kaynaklanır.
+                    else if (originalHost && url.startsWith(CF_WORKER + '/') 
+                             && !url.startsWith(CF_WORKER + '/http/')
+                             && !url.startsWith(CF_WORKER + '/https/')) {
+                        const relativePath = url.substring(CF_WORKER.length); // "/b1c/229.ts" gibi
+                        url = `${CF_WORKER}/http/${originalHost}${relativePath}`;
+                        console.log('[HLS Proxy Fix] Kök-göreli segment düzeltildi:', url);
+                    }
+
+                    return new Request(url, initParams);
                 }
             });
             hls.loadSource(playUrl);
             hls.attachMedia(video);
+
             
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
                 video.play().catch(e => {

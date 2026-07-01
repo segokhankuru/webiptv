@@ -61,17 +61,30 @@ export const apiClient = {
     
     async proxyM3u(url) {
         let response;
-        try {
-            // Önce doğrudan çekmeyi deneriz (aynı origin veya CORS izinliyse hızlıca)
-            response = await fetch(url);
-        } catch (e) {
-            console.warn('Direct fetch failed (CORS), trying Cloudflare Worker proxy...');
+
+        // http:// URL'leri için direkt fetch Mixed Content nedeniyle tarayıcı tarafından
+        // engellenir — zaman kaybetmeden Cloudflare Worker'a yönlendiririz
+        const isHttp = url.startsWith('http://');
+
+        if (!isHttp) {
+            try {
+                // https:// URL'ler için önce doğrudan çekmeyi deneriz (CORS izinliyse hızlı)
+                response = await fetch(url);
+            } catch (e) {
+                console.warn('Direct fetch failed (CORS), trying Cloudflare Worker proxy...');
+            }
         }
         
         if (!response || !response.ok) {
-            // Doğrudan çekilemediyse Cloudflare Worker proxy'sine yönlendiririz (Mixed Content ve Vercel limitlerini aşmak için)
-            const cfProxyUrl = `https://webiptv.se-gokhankuru.workers.dev/?url=${encodeURIComponent(url)}`;
+            // Path-based proxy formatını kullan (/http/domain/path) — player.js ile tutarlı
+            let cfProxyUrl;
+            if (isHttp) {
+                cfProxyUrl = `https://webiptv.se-gokhankuru.workers.dev/http/${url.substring(7)}`;
+            } else {
+                cfProxyUrl = `https://webiptv.se-gokhankuru.workers.dev/https/${url.substring(8)}`;
+            }
             try {
+                console.log('Cloudflare Worker proxy ile çekiliyor...');
                 response = await fetch(cfProxyUrl);
             } catch (err) {
                 console.warn('Cloudflare Worker proxy failed, falling back to local backend proxy...');
@@ -87,6 +100,7 @@ export const apiClient = {
         // JS reader döngüsü yerine tarayıcının kendi C++ motoruyla (anında) string'e çeviriyoruz
         return await response.text();
     },
+
     
     async updateSourceChannelCount(sourceId, channelCount) {
         return this.request('/channels/sync-meta', {
