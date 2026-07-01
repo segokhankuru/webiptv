@@ -862,40 +862,48 @@ export async function renderPlayer(channelId) {
 
         } else if (Hls.isSupported()) {
             // HLS.js — m3u8, canlı TV, Xtream ve uzantısız/bilinmeyen tüm yayınlar
-            // (Canlı yayınlar genelde uzantısız olduğundan buraya gelir — native'e bırakılmamalı)
             const CF_WORKER = 'https://webiptv.se-gokhankuru.workers.dev';
-            // Orijinal sunucunun host:port bilgisi (segment URL'lerini düzeltmek için)
             const originalHost = (() => {
                 try { return new URL(rawUrl).host; } catch(e) { return null; }
             })();
+
+            // Özel proxy loader: HLS.js'in her XHR isteğinden önce URL'yi yakalar ve düzeltir.
+            // fetchSetup aksine bu yöntem XHR tabanlı varsayılan loader ile de çalışır.
+            const ProxyLoader = class extends Hls.DefaultConfig.loader {
+                load(context, config, callbacks) {
+                    let url = context.url;
+
+                    // Durum 1: Segment http:// ile başlıyor → proxy'ye gönder
+                    if (url.startsWith('http://')) {
+                        url = `${CF_WORKER}/http/${url.substring(7)}`;
+                        console.log('[HLS Proxy] http:// segment proxied:', url);
+                    }
+                    // Durum 2: URL worker domain'indedir ama /http/ veya /https/ prefiksi yok.
+                    // m3u8 içindeki root-relative path'ler (/hls/.../seg.ts gibi) HLS.js tarafından
+                    // worker domain'ine relative çözümlenir ve /http/ prefiksi düşer.
+                    else if (originalHost
+                             && url.startsWith(CF_WORKER + '/')
+                             && !url.startsWith(CF_WORKER + '/http/')
+                             && !url.startsWith(CF_WORKER + '/https/')) {
+                        const relativePath = url.substring(CF_WORKER.length);
+                        url = `${CF_WORKER}/http/${originalHost}${relativePath}`;
+                        console.log('[HLS Proxy] Root-relative segment fixed:', url);
+                    }
+
+                    context.url = url;
+                    super.load(context, config, callbacks);
+                }
+            };
 
             hls = new Hls({
                 maxBufferLength: 30,
                 enableWorker: true,
                 lowLatencyMode: false,
-                fetchSetup: function(context, initParams) {
-                    let url = context.url;
-
-                    // Durum 1: Segment URL'si http:// → doğrudan proxy'ye gönder
-                    if (url.startsWith('http://')) {
-                        url = `${CF_WORKER}/http/${url.substring(7)}`;
-                    }
-                    // Durum 2: Segment URL'si worker domain'indedir ama /http/ veya /https/ prefiksi yoktur.
-                    // Bu, m3u8 içindeki kök-göreli (/path/segment.ts) URL'lerin
-                    // HLS.js tarafından yanlış çözümlenmesinden kaynaklanır.
-                    else if (originalHost && url.startsWith(CF_WORKER + '/') 
-                             && !url.startsWith(CF_WORKER + '/http/')
-                             && !url.startsWith(CF_WORKER + '/https/')) {
-                        const relativePath = url.substring(CF_WORKER.length); // "/b1c/229.ts" gibi
-                        url = `${CF_WORKER}/http/${originalHost}${relativePath}`;
-                        console.log('[HLS Proxy Fix] Kök-göreli segment düzeltildi:', url);
-                    }
-
-                    return new Request(url, initParams);
-                }
+                loader: ProxyLoader,
             });
             hls.loadSource(playUrl);
             hls.attachMedia(video);
+
 
             
             hls.on(Hls.Events.MANIFEST_PARSED, function() {
