@@ -16,8 +16,40 @@ const PROXY_BASE = '/api/proxy/xtream';
  * Xtream player_api.php endpoint'ini proxy üzerinden çağırır
  */
 async function xtreamCall(server, username, password, action, extraParams = {}) {
+    // Sunucu adresinin sonundaki slash'ı temizle
+    const cleanServer = server.replace(/\/$/, '');
+    const isHttp = cleanServer.startsWith('http://');
+    let targetUrl = `${cleanServer}/player_api.php`;
+    const searchParams = new URLSearchParams({
+        username,
+        password,
+        action,
+        ...extraParams
+    });
+    targetUrl += `?${searchParams.toString()}`;
+
+    // Cloudflare Worker proxy adresini oluştur
+    let cfProxyUrl;
+    if (isHttp) {
+        cfProxyUrl = `https://webiptv.se-gokhankuru.workers.dev/http/${targetUrl.substring(7)}`;
+    } else {
+        cfProxyUrl = `https://webiptv.se-gokhankuru.workers.dev/https/${targetUrl.substring(8)}`;
+    }
+
+    try {
+        console.log('Xtream call via Cloudflare Worker proxy...', action);
+        const response = await fetch(cfProxyUrl);
+        if (response.ok) {
+            return await response.json();
+        }
+        console.warn(`Cloudflare Worker proxy returned status ${response.status} for action: ${action}, falling back...`);
+    } catch (err) {
+        console.warn('Cloudflare Worker proxy failed for Xtream, falling back to local backend proxy...', err);
+    }
+
+    // Fallback: Yerel/Express backend proxy
     const params = new URLSearchParams({
-        server,
+        server: cleanServer,
         username,
         password,
         action,

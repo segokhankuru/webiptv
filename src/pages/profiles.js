@@ -499,6 +499,21 @@ export async function renderProfiles() {
             return;
         }
 
+        // Sunucu URL ve Port doğrulaması
+        try {
+            const urlObj = new URL(srv);
+            if (urlObj.port) {
+                const port = parseInt(urlObj.port, 10);
+                if (isNaN(port) || port < 1 || port > 65535) {
+                    showXtreamStatus('❌ Geçersiz port numarası! Port 1 ile 65535 arasında olmalıdır.', 'error');
+                    return;
+                }
+            }
+        } catch (e) {
+            showXtreamStatus('❌ Geçersiz sunucu adresi! Lütfen geçerli bir URL girin (örn: http://sadeturk.com:8080)', 'error');
+            return;
+        }
+
         xtreamVerifyBtn.disabled = true;
         xtreamVerifyBtn.textContent = '⏳ Test ediliyor...';
         xtreamStatus.style.display = 'none';

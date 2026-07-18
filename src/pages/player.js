@@ -175,7 +175,7 @@ export async function renderPlayer(channelId) {
             const profile = xtreamAPI.getActiveXtreamProfile();
             if (!profile) throw new Error('Aktif Xtream profili bulunamadı.');
             
-            const ext = type === 'live' ? 'm3u8' : (playInfo.container_extension || 'mp4');
+            const ext = playInfo.container_extension || (type === 'live' ? 'ts' : 'mp4');
             const streamUrl = xtreamAPI.buildStreamUrl(profile.server_url, profile.username, profile.password, streamId, type, ext);
             
             channel = {
@@ -512,40 +512,12 @@ export async function renderPlayer(channelId) {
         });
 
         let hls = null;
+        let mpegtsPlayer = null;
         if (!channel.streamUrl) {
             throw new Error('Bu kanal için yayın adresi (streamUrl) bulunamadı. Profili yeniden senkronize edin.');
         }
 
-        const convertLiveTsToM3u8 = (url) => {
-            if (!url) return url;
-            
-            // 1. Xtream Codes standard live stream URLs with /live/ and ending with .ts or no extension
-            // e.g., http://domain:port/live/username/password/12345.ts or /12345
-            const livePattern1 = /(\/live\/[^\/]+\/[^\/]+\/\d+)(?:\.ts)?$/i;
-            if (livePattern1.test(url)) {
-                return url.replace(livePattern1, '$1.m3u8');
-            }
-            
-            // 2. Xtream Codes live streams without /live/ segment but with user/pass/stream_id format
-            // e.g., http://domain:port/username/password/12345 (make sure it doesn't contain /movie/ or /series/)
-            const livePattern2 = /\/([^\/]+)\/([^\/]+)\/(\d+)(?:\.ts)?$/i;
-            const match = url.match(livePattern2);
-            if (match) {
-                try {
-                    const urlObj = new URL(url);
-                    const path = urlObj.pathname;
-                    if (!path.includes('/movie/') && !path.includes('/series/') && !path.includes('/live/')) {
-                        urlObj.pathname = `/live/${match[1]}/${match[2]}/${match[3]}.m3u8`;
-                        return urlObj.toString();
-                    }
-                } catch (e) {
-                    console.error("URL parsing error in convertLiveTsToM3u8:", e);
-                }
-            }
-            return url;
-        };
-
-        const rawUrl = convertLiveTsToM3u8(channel.streamUrl);
+        const rawUrl = channel.streamUrl;
         
         // HTTP yayınları Cloudflare Worker üzerinden HTTPS proxy yaparak oynatıyoruz
         let playUrl = rawUrl;
@@ -557,15 +529,12 @@ export async function renderPlayer(channelId) {
          * Format algılama:
          * - .m3u8 → HLS.js (zorunlu)
          * - .mkv, .mp4, .avi, .mov, .webm → native video
-         * - Uzantısız (canlı TV, Xtream live) → HLS.js (varsayılan)
-         * - Bilinmeyen → HLS.js, hata alırsa native
+         * - .ts veya uzantısız akışlar → mpegts.js (varsayılan canlı)
          */
         const urlLower = rawUrl.toLowerCase().split('?')[0]; // query string'i çıkar
-        // Not: \. ile regex'teki nokta karakteri düzgün escape edildi (daha önce \\. idi ve hiç match etmiyordu)
         const isDirectVideo = /\.(mkv|mp4|avi|mov|webm|flv|wmv|ogv|3gp|m4v)$/.test(urlLower);
         const isHls = urlLower.endsWith('.m3u8') || urlLower.includes('.m3u8?') || urlLower.includes('/hls/');
-        // .ts uzantısı hem HLS segmenti hem de doğrudan video olabilir — HLS.js denesin
-        const isTsSegment = urlLower.endsWith('.ts');
+        const isTs = !isDirectVideo && !isHls;
 
         if (isDirectVideo) {
             // Native video player — MKV, MP4 ve diğer doğrudan dosyalar
@@ -887,6 +856,72 @@ export async function renderPlayer(channelId) {
             window.__currentPageCleanup = function() {
                 isReading = false;
                 if (reader) reader.cancel();
+            };
+
+        } else if (isTs) {
+            // mpegts.js — Canlı TV (TS ve uzantısız) yayınları için
+            const loadMpegts = async () => {
+                if (window.mpegts) return window.mpegts;
+                const proxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://unpkg.com/mpegts.js@1.7.3/dist/mpegts.min.js');
+                const fallbackProxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.min.js');
+                
+                const tryLoad = async (url) => {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error(`Status ${res.status}`);
+                    const code = await res.text();
+                    (new Function(code))();
+                    if (!window.mpegts) throw new Error("mpegts is undefined");
+                    return window.mpegts;
+                };
+
+                try {
+                    return await tryLoad(proxyUrl);
+                } catch (e) {
+                    return await tryLoad(fallbackProxyUrl);
+                }
+            };
+
+            loadMpegts().then(mpegts => {
+                if (mpegts.getFeatureList().mseLivePlayback) {
+                    mpegtsPlayer = mpegts.createPlayer({
+                        type: 'mpegts',
+                        isLive: true,
+                        url: playUrl
+                    }, {
+                        enableWorker: true,
+                        enableStashBuffer: false,
+                        liveBufferLatencyChasing: true,
+                        stashInitialSize: 128
+                    });
+                    mpegtsPlayer.attachMediaElement(video);
+                    mpegtsPlayer.load();
+                    mpegtsPlayer.play().catch(e => {
+                        console.log('mpegts autoplay blocked:', e);
+                        playPauseBtn.innerHTML = icons.play;
+                    });
+
+                    mpegtsPlayer.on(mpegts.Events.ERROR, (type, detail, info) => {
+                        console.error('mpegts error:', type, detail, info);
+                        showToast('Yayın yüklenemedi. Bağlantı hatası.');
+                        playPauseBtn.innerHTML = icons.play;
+                    });
+                } else {
+                    throw new Error("MSE Live Playback is not supported");
+                }
+            }).catch(err => {
+                console.error("mpegts init failed, falling back to native:", err);
+                video.src = playUrl;
+                video.play().catch(() => {
+                    playPauseBtn.innerHTML = icons.play;
+                });
+            });
+
+            // Cleanup: Router tarafından sayfa değişiminde çağrılır
+            window.__currentPageCleanup = function() {
+                if (mpegtsPlayer) {
+                    mpegtsPlayer.destroy();
+                    mpegtsPlayer = null;
+                }
             };
 
         } else if (Hls.isSupported()) {
