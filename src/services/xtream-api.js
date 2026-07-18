@@ -172,7 +172,8 @@ export async function getAllCategories(server, username, password) {
  */
 export function buildStreamUrl(server, username, password, streamId, type = 'live', ext = 'm3u8') {
     const cleanServer = server.replace(/\/$/, '');
-    return `${cleanServer}/${type}/${username}/${password}/${streamId}.${ext}`;
+    const pathType = type === 'vod' ? 'movie' : type;
+    return `${cleanServer}/${pathType}/${username}/${password}/${streamId}.${ext}`;
 }
 
 /**

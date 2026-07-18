@@ -553,6 +553,25 @@ export async function renderProfiles() {
         xtreamStatus.textContent = msg;
     }
 
+    // URL'den Xtream bilgilerini ayıklayan yardımcı fonksiyon
+    function parseXtreamFromM3uUrl(urlStr) {
+        try {
+            const url = new URL(urlStr);
+            const username = url.searchParams.get('username') || url.searchParams.get('user');
+            const password = url.searchParams.get('password') || url.searchParams.get('pass');
+            if (username && password) {
+                return {
+                    server: url.origin,
+                    username: username,
+                    password: password
+                };
+            }
+        } catch (e) {
+            // Geçersiz URL
+        }
+        return null;
+    }
+
     // ──── Kaydet ────────────────────────────────────────────────────────────
 
     saveProfileBtn.addEventListener('click', async () => {
@@ -586,13 +605,44 @@ export async function renderProfiles() {
                 saveProfileBtn.style.color = '#000';
             }
         } else {
-            // ─ M3U kaydet
+            // ─ M3U kaydet (ya da URL Xtream ise otomatik olarak Xtream kaydet)
             const url = newUrlInput.value.trim();
             const hasFile = !!selectedFileContent;
             if (!url && !hasFile) {
                 alert('M3U linki girin veya dosya seçin.');
                 return;
             }
+
+            // Eğer girilen URL bir Xtream M3U linkiyse (username ve password içeriyorsa) otomatik dönüştür
+            if (url && !hasFile) {
+                const xtreamInfo = parseXtreamFromM3uUrl(url);
+                if (xtreamInfo) {
+                    console.log('M3U link is actually an Xtream server, saving as Xtream profile:', xtreamInfo);
+                    try {
+                        saveProfileBtn.disabled = true;
+                        saveProfileBtn.textContent = 'Ekleniyor (Xtream)...';
+                        const newProfile = await apiClient.addXtreamSource({
+                            name,
+                            server: xtreamInfo.server,
+                            username: xtreamInfo.username,
+                            password: xtreamInfo.password
+                        });
+                        closeAddModal();
+                        await loadProfiles();
+                        // Xtream profili hemen aktif et ve yönlendir
+                        xtreamAPI.saveActiveXtreamProfile(newProfile);
+                        localStorage.setItem('iptv_active_source_id', newProfile.id);
+                        window.location.hash = '#/home';
+                        return;
+                    } catch (e) {
+                        console.warn('Xtream olarak ekleme başarısız oldu, normal M3U olarak denenecek...', e);
+                    } finally {
+                        saveProfileBtn.disabled = false;
+                        saveProfileBtn.textContent = 'Kaydet';
+                    }
+                }
+            }
+
             try {
                 saveProfileBtn.disabled = true;
                 saveProfileBtn.textContent = 'Ekleniyor...';
