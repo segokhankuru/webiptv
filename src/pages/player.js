@@ -175,7 +175,7 @@ export async function renderPlayer(channelId) {
             const profile = xtreamAPI.getActiveXtreamProfile();
             if (!profile) throw new Error('Aktif Xtream profili bulunamadı.');
             
-            const ext = playInfo.container_extension || (type === 'live' ? 'm3u8' : 'mp4');
+            const ext = type === 'live' ? 'm3u8' : (playInfo.container_extension || 'mp4');
             const streamUrl = xtreamAPI.buildStreamUrl(profile.server_url, profile.username, profile.password, streamId, type, ext);
             
             channel = {
@@ -516,7 +516,36 @@ export async function renderPlayer(channelId) {
             throw new Error('Bu kanal için yayın adresi (streamUrl) bulunamadı. Profili yeniden senkronize edin.');
         }
 
-        const rawUrl = channel.streamUrl;
+        const convertLiveTsToM3u8 = (url) => {
+            if (!url) return url;
+            
+            // 1. Xtream Codes standard live stream URLs with /live/ and ending with .ts or no extension
+            // e.g., http://domain:port/live/username/password/12345.ts or /12345
+            const livePattern1 = /(\/live\/[^\/]+\/[^\/]+\/\d+)(?:\.ts)?$/i;
+            if (livePattern1.test(url)) {
+                return url.replace(livePattern1, '$1.m3u8');
+            }
+            
+            // 2. Xtream Codes live streams without /live/ segment but with user/pass/stream_id format
+            // e.g., http://domain:port/username/password/12345 (make sure it doesn't contain /movie/ or /series/)
+            const livePattern2 = /\/([^\/]+)\/([^\/]+)\/(\d+)(?:\.ts)?$/i;
+            const match = url.match(livePattern2);
+            if (match) {
+                try {
+                    const urlObj = new URL(url);
+                    const path = urlObj.pathname;
+                    if (!path.includes('/movie/') && !path.includes('/series/') && !path.includes('/live/')) {
+                        urlObj.pathname = `/live/${match[1]}/${match[2]}/${match[3]}.m3u8`;
+                        return urlObj.toString();
+                    }
+                } catch (e) {
+                    console.error("URL parsing error in convertLiveTsToM3u8:", e);
+                }
+            }
+            return url;
+        };
+
+        const rawUrl = convertLiveTsToM3u8(channel.streamUrl);
         
         // HTTP yayınları Cloudflare Worker üzerinden HTTPS proxy yaparak oynatıyoruz
         let playUrl = rawUrl;
