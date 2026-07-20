@@ -175,7 +175,9 @@ export async function renderPlayer(channelId) {
             const profile = xtreamAPI.getActiveXtreamProfile();
             if (!profile) throw new Error('Aktif Xtream profili bulunamadı.');
             
-            const ext = playInfo.container_extension || (type === 'live' ? 'ts' : 'mp4');
+            // Force m3u8 for live streams to ensure compatibility with HLS players (especially Safari/mobile),
+            // even if the stored container_extension is 'ts' (e.g. from previous versions or legacy favorites)
+            const ext = (type === 'live') ? 'm3u8' : (playInfo.container_extension || 'mp4');
             const streamUrl = xtreamAPI.buildStreamUrl(profile.server_url, profile.username, profile.password, streamId, type, ext);
             
             channel = {

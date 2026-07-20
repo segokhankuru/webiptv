@@ -183,7 +183,26 @@ export function buildStreamUrl(server, username, password, streamId, type = 'liv
 export function getActiveXtreamProfile() {
     try {
         const raw = localStorage.getItem('iptv_active_xtream_profile');
-        return raw ? JSON.parse(raw) : null;
+        if (!raw) return null;
+        const profile = JSON.parse(raw);
+        
+        // Support fallback property names for compatibility with previous versions/backend payload formats
+        const server_url = profile.server_url || profile.xtream_server || profile.server;
+        const username = profile.username || profile.xtream_username;
+        const password = profile.password || profile.xtream_password;
+
+        if (!server_url || !username || !password) {
+            return null;
+        }
+
+        return {
+            id: profile.id,
+            name: profile.name,
+            source_type: 'xtream',
+            server_url,
+            username,
+            password
+        };
     } catch {
         return null;
     }
@@ -193,14 +212,14 @@ export function getActiveXtreamProfile() {
  * Aktif Xtream profil bilgilerini localStorage'a kaydeder
  */
 export function saveActiveXtreamProfile(profile) {
-    if (profile && profile.source_type === 'xtream') {
+    if (profile && (profile.source_type === 'xtream' || profile.xtream_server || profile.server_url)) {
         localStorage.setItem('iptv_active_xtream_profile', JSON.stringify({
             id: profile.id,
             name: profile.name,
             source_type: 'xtream',
-            server_url: profile.server_url,
-            username: profile.username,
-            password: profile.password
+            server_url: profile.server_url || profile.xtream_server || profile.server,
+            username: profile.username || profile.xtream_username,
+            password: profile.password || profile.xtream_password
         }));
     } else {
         localStorage.removeItem('iptv_active_xtream_profile');

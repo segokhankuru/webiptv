@@ -29,8 +29,27 @@ async function bootstrap() {
             if (me && me.theme) {
                 document.documentElement.setAttribute('data-theme', me.theme);
             }
+
+            // Restore active Xtream profile if missing/corrupt in localStorage but active source is set
+            const activeSourceId = localStorage.getItem('iptv_active_source_id');
+            if (activeSourceId) {
+                const { xtreamAPI } = await import('./services/xtream-api.js');
+                const hasXtreamProfile = xtreamAPI.getActiveXtreamProfile();
+                if (!hasXtreamProfile) {
+                    try {
+                        const sources = await apiClient.getSources();
+                        const activeSource = sources.find(s => String(s.id) === String(activeSourceId));
+                        if (activeSource && activeSource.source_type === 'xtream') {
+                            xtreamAPI.saveActiveXtreamProfile(activeSource);
+                            console.log('Restored active Xtream profile session in localStorage');
+                        }
+                    } catch (err) {
+                        console.warn('Failed to restore active profile during bootstrap:', err);
+                    }
+                }
+            }
         } catch(e) {
-            console.warn('Geçersiz token, giriş sayfasına yönlendirilecek.');
+            console.warn('Geçersiz token, giriş sayfasına yönlendirilecek.', e);
         }
     }
     initRouter();
