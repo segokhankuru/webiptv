@@ -95,7 +95,7 @@ async function saveChannels(sourceId, channels, onProgress) {
 
             let logo = ch.logo || null;
             if (logo && logo.startsWith('http://')) {
-                logo = `/api/proxy/m3u?url=${encodeURIComponent(logo)}`;
+                logo = `https://webiptv.se-gokhankuru.workers.dev/http/${logo.substring(7)}`;
             }
 
             const record = {

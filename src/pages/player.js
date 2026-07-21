@@ -42,7 +42,14 @@ export async function renderPlayer(channelId) {
                 <!-- Left: Video Player and Info -->
                 <div style="flex: 1; min-width: 60%;">
                     <div id="video-wrapper" style="width: 100%; aspect-ratio: 16/9; background: #000; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
-                        <video id="hls-video" crossorigin="anonymous" style="width: 100%; height: 100%; outline: none; cursor: pointer;" autoplay playsinline webkit-playsinline x5-playsinline></video>
+                        <video id="hls-video" style="width: 100%; height: 100%; outline: none; cursor: pointer;" autoplay playsinline webkit-playsinline x5-playsinline></video>
+                        
+                        <!-- Big Play Overlay for Mobile Autoplay Policy -->
+                        <div id="big-play-btn" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); z-index: 22; cursor: pointer;">
+                            <div style="width: 68px; height: 68px; background: rgba(229,9,20,0.9); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 25px rgba(0,0,0,0.6); transition: transform 0.2s;">
+                                <svg height="34" viewBox="0 0 24 24" width="34" fill="white"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                        </div>
                         
                         <!-- Netflix Style Subtitle Overlay -->
                         <div id="subtitle-overlay" style="position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); text-align: center; color: white; font-size: 22px; font-weight: 500; text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 4px; pointer-events: none; z-index: 24; display: none; max-width: 85%; line-height: 1.4; font-family: 'Inter', 'Roboto', sans-serif; transition: all 0.1s;"></div>
@@ -197,7 +204,7 @@ export async function renderPlayer(channelId) {
         const proxyLogoUrl = (url) => {
             if (!url) return '';
             if (url.startsWith('http://')) {
-                return `/api/proxy/m3u?url=${encodeURIComponent(url)}`;
+                return `https://webiptv.se-gokhankuru.workers.dev/http/${url.substring(7)}`;
             }
             return url;
         };
@@ -396,15 +403,48 @@ export async function renderPlayer(channelId) {
             showControls();
         }, { passive: true });
 
+        const bigPlayBtn = document.getElementById('big-play-btn');
+
+        const safePlay = () => {
+            const p = video.play();
+            if (p !== undefined) {
+                p.then(() => {
+                    if (bigPlayBtn) bigPlayBtn.style.display = 'none';
+                    playPauseBtn.innerHTML = icons.pause;
+                }).catch(err => {
+                    console.log('Mobile autoplay blocked:', err);
+                    if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
+                    playPauseBtn.innerHTML = icons.play;
+                });
+            }
+        };
+
+        if (bigPlayBtn) {
+            bigPlayBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                video.muted = false;
+                safePlay();
+            });
+        }
+
         // Play/Pause
         const togglePlay = () => {
-            if (video.paused) video.play();
-            else video.pause();
+            if (video.paused) safePlay();
+            else {
+                video.pause();
+                if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
+            }
         };
         playPauseBtn.addEventListener('click', togglePlay);
         video.addEventListener('click', togglePlay);
-        video.addEventListener('play', () => playPauseBtn.innerHTML = icons.pause);
-        video.addEventListener('pause', () => { playPauseBtn.innerHTML = icons.play; showControls(); });
+        video.addEventListener('play', () => {
+            if (bigPlayBtn) bigPlayBtn.style.display = 'none';
+            playPauseBtn.innerHTML = icons.pause;
+        });
+        video.addEventListener('pause', () => {
+            playPauseBtn.innerHTML = icons.play;
+            showControls();
+        });
 
         // Volume
         volumeSlider.addEventListener('input', (e) => {
@@ -639,7 +679,9 @@ export async function renderPlayer(channelId) {
                             if (idx === -1) return;
 
                             const selectedSub = subs[idx];
-                            const subUrl = `/api/proxy/m3u?url=${encodeURIComponent(selectedSub.url)}`;
+                            const subUrl = selectedSub.url.startsWith('http://')
+                                ? `https://webiptv.se-gokhankuru.workers.dev/http/${selectedSub.url.substring(7)}`
+                                : selectedSub.url;
                             
                             try {
                                 const subResponse = await fetch(subUrl);
@@ -852,8 +894,26 @@ export async function renderPlayer(channelId) {
                 }
             });
 
+            let videoErrorFallbackTried = false;
+            const getFallbackProxyUrl = (url) => {
+                if (!url) return '';
+                if (url.startsWith('http://') || url.startsWith('https://')) {
+                    return `/api/proxy/stream?url=${encodeURIComponent(url)}`;
+                }
+                return url;
+            };
+
             video.addEventListener('error', () => {
-                const codes = { 1: 'Kullanıcı iptal etti', 2: 'Ağ hatası', 3: 'Decode hatası', 4: 'Desteklenmeyen format' };
+                console.warn("Video element error:", video.error);
+                if (!videoErrorFallbackTried && rawUrl) {
+                    videoErrorFallbackTried = true;
+                    console.log("Direct video failed, trying backend proxy fallback...");
+                    const fbUrl = getFallbackProxyUrl(rawUrl);
+                    video.src = fbUrl;
+                    safePlay();
+                    return;
+                }
+                const codes = { 1: 'Kullanıcı iptal etti', 2: 'Ağ hatası', 3: 'Decode hatası', 4: 'Desteklenmeyen format veya ağ hatası' };
                 const msg = codes[video.error?.code] || 'Bilinmeyen hata';
                 showToast(`Video yüklenemedi: ${msg}`);
             });
@@ -887,48 +947,57 @@ export async function renderPlayer(channelId) {
                 }
             };
 
-            loadMpegts().then(mpegts => {
-                if (mpegts.getFeatureList().mseLivePlayback) {
-                    mpegtsPlayer = mpegts.createPlayer({
-                        type: 'mpegts',
-                        isLive: true,
-                        url: playUrl
-                    }, {
-                        enableWorker: true,
-                        enableStashBuffer: false,
-                        liveBufferLatencyChasing: true,
-                        stashInitialSize: 128
-                    });
-                    mpegtsPlayer.attachMediaElement(video);
-                    mpegtsPlayer.load();
-                    mpegtsPlayer.play().catch(e => {
-                        console.log('mpegts autoplay blocked:', e);
-                        playPauseBtn.innerHTML = icons.play;
-                    });
+            let mpegtsFallbackTried = false;
+            const tryMpegtsWithUrl = (targetUrl) => {
+                loadMpegts().then(mpegts => {
+                    if (mpegts.getFeatureList().mseLivePlayback) {
+                        mpegtsPlayer = mpegts.createPlayer({
+                            type: 'mpegts',
+                            isLive: true,
+                            url: targetUrl
+                        }, {
+                            enableWorker: true,
+                            enableStashBuffer: false,
+                            liveBufferLatencyChasing: true,
+                            stashInitialSize: 128
+                        });
+                        mpegtsPlayer.attachMediaElement(video);
+                        mpegtsPlayer.load();
+                        safePlay();
 
-                    mpegtsPlayer.on(mpegts.Events.ERROR, (type, detail, info) => {
-                        console.error('mpegts error:', type, detail, info);
-                        showToast('Yayın yüklenemedi. Bağlantı hatası.');
-                        playPauseBtn.innerHTML = icons.play;
-                    });
-                } else {
-                    throw new Error("MSE Live Playback is not supported");
-                }
-            }).catch(err => {
-                console.error("mpegts init failed, falling back to native:", err);
-                // Safari iOS için HLS (.m3u8) fallback dene
-                let safariPlayUrl = playUrl;
-                if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    safariPlayUrl = playUrl.replace(/\.ts($|\?)/, '.m3u8$1');
-                    if (!safariPlayUrl.includes('.m3u8')) {
-                        safariPlayUrl += '.m3u8';
+                        mpegtsPlayer.on(mpegts.Events.ERROR, (type, detail, info) => {
+                            console.error('mpegts error:', type, detail, info);
+                            if (!mpegtsFallbackTried) {
+                                mpegtsFallbackTried = true;
+                                console.log('mpegts primary proxy failed, trying backend stream proxy...');
+                                try { mpegtsPlayer.destroy(); } catch(e){}
+                                mpegtsPlayer = null;
+                                const fbUrl = `/api/proxy/stream?url=${encodeURIComponent(rawUrl)}`;
+                                tryMpegtsWithUrl(fbUrl);
+                                return;
+                            }
+                            showToast('Yayın yüklenemedi. Bağlantı hatası.');
+                            playPauseBtn.innerHTML = icons.play;
+                        });
+                    } else {
+                        throw new Error("MSE Live Playback is not supported");
                     }
-                }
-                video.src = safariPlayUrl;
-                video.play().catch(() => {
-                    playPauseBtn.innerHTML = icons.play;
+                }).catch(err => {
+                    console.error("mpegts init failed, falling back to native:", err);
+                    // Safari iOS için HLS (.m3u8) fallback dene
+                    let safariPlayUrl = targetUrl;
+                    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                        safariPlayUrl = targetUrl.replace(/\.ts($|\?)/, '.m3u8$1');
+                        if (!safariPlayUrl.includes('.m3u8')) {
+                            safariPlayUrl += '.m3u8';
+                        }
+                    }
+                    video.src = safariPlayUrl;
+                    safePlay();
                 });
-            });
+            };
+
+            tryMpegtsWithUrl(playUrl);
 
             // Cleanup: Router tarafından sayfa değişiminde çağrılır
             window.__currentPageCleanup = function() {
@@ -1029,7 +1098,51 @@ export async function renderPlayer(channelId) {
                 hls.subtitleTrack = parseInt(e.target.value);
             };
 
+            let hlsFallbackTried = false;
             hls.on(Hls.Events.ERROR, function(event, data) {
+                console.warn('[HLS.js Hata/Uyarı]', data);
+                
+                // Eğer HLS segmentlerinde 403 Forbidden veya fatal hata alınırsa direct TS/mpegts moduna otomatik geç
+                if ((data.fatal || data.response?.code === 403) && !hlsFallbackTried) {
+                    hlsFallbackTried = true;
+                    console.log('[HLS Fallback] HLS hatası / 403 alındı, direct TS mpegts moduna geçiliyor...');
+                    try { hls.destroy(); } catch(e){}
+                    hls = null;
+
+                    let tsRawUrl = rawUrl.replace(/\.m3u8($|\?)/, '.ts$1');
+                    if (!tsRawUrl.endsWith('.ts') && !tsRawUrl.includes('.ts?')) {
+                        tsRawUrl = tsRawUrl.replace(/\/hls\//, '/live/');
+                    }
+                    let tsPlayUrl = tsRawUrl;
+                    if (tsRawUrl.startsWith('http://')) {
+                        tsPlayUrl = `https://webiptv.se-gokhankuru.workers.dev/http/${tsRawUrl.substring(7)}`;
+                    }
+
+                    loadMpegts().then(mpegts => {
+                        if (mpegts.getFeatureList().mseLivePlayback) {
+                            mpegtsPlayer = mpegts.createPlayer({
+                                type: 'mpegts',
+                                isLive: true,
+                                url: tsPlayUrl
+                            }, {
+                                enableWorker: true,
+                                enableStashBuffer: false,
+                                liveBufferLatencyChasing: true
+                            });
+                            mpegtsPlayer.attachMediaElement(video);
+                            mpegtsPlayer.load();
+                            mpegtsPlayer.play().catch(() => { playPauseBtn.innerHTML = icons.play; });
+                        } else {
+                            video.src = tsPlayUrl;
+                            video.play().catch(() => { playPauseBtn.innerHTML = icons.play; });
+                        }
+                    }).catch(() => {
+                        video.src = tsPlayUrl;
+                        video.play().catch(() => { playPauseBtn.innerHTML = icons.play; });
+                    });
+                    return;
+                }
+
                 if (data.fatal) {
                     showToast('Yayın yüklenemedi. Bağlantı hatası.');
                     playPauseBtn.innerHTML = icons.play;
