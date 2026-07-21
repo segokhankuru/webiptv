@@ -281,7 +281,10 @@ export async function renderPlayer(channelId) {
                             
                             let onClickAttr = `window.location.hash='#/player/${rc.id}'`;
                             if (String(rc.id).startsWith('xtream_') && rc.raw) {
-                                onClickAttr = `window.playXtreamStream('${rc.id}', '${encodeURIComponent(JSON.stringify(rc.raw))}')`;
+                                if (window.registerStreamInfo) {
+                                    window.registerStreamInfo(rc.id, rc.raw);
+                                }
+                                onClickAttr = `window.playXtreamStream('${rc.id}')`;
                             }
                             
                             rHtml += `

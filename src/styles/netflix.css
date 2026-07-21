@@ -220,6 +220,7 @@
     justify-content: center;
     opacity: 0;
     transition: opacity 0.2s;
+    pointer-events: none;
 }
 .channel-card:hover .play-overlay {
     opacity: 1;

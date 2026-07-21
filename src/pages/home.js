@@ -365,9 +365,13 @@ async function loadXtreamCategoryChannels(type, categoryId, categoryName, rowId,
             // Enrich details
             ch.category_name = categoryName;
             ch.category_id = categoryId;
+
+            if (window.registerStreamInfo) {
+                window.registerStreamInfo(cardId, ch);
+            }
             
             html += `
-                <div class="channel-card" id="card-${cardId}" onclick="sessionStorage.setItem('last_played_channel', '${cardId}'); sessionStorage.setItem('last_played_row', '${rowId}'); window.playXtreamStream('${cardId}', '${encodeURIComponent(JSON.stringify(ch))}')">
+                <div class="channel-card" id="card-${cardId}" onclick="sessionStorage.setItem('last_played_channel', '${cardId}'); sessionStorage.setItem('last_played_row', '${rowId}'); window.playXtreamStream('${cardId}')">
                     <div class="card-img-container">
                         <img src="${logoUrl}" alt="${ch.name}" loading="lazy" onerror="this.src='https://placehold.co/160x90/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}'">
                         <div class="play-overlay"><i class="material-icons">play_circle_outline</i></div>

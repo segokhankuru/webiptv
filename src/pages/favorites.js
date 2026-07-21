@@ -98,7 +98,10 @@ export async function renderFavorites() {
                     category_name: 'Favoriler',
                     container_extension: ch.stream_url ? (ch.stream_url.split('.').pop() || 'm3u8') : 'm3u8'
                 };
-                onClickAttr = `window.playXtreamStream('${ch.channel_id}', '${encodeURIComponent(JSON.stringify(playObj))}')`;
+                if (window.registerStreamInfo) {
+                    window.registerStreamInfo(ch.channel_id, playObj);
+                }
+                onClickAttr = `window.playXtreamStream('${ch.channel_id}')`;
             }
 
             html += `

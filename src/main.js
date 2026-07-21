@@ -4,18 +4,35 @@ import './styles/netflix.css';
 import { initRouter } from './router.js';
 import { apiClient } from './services/api-client.js';
 
+window.__streamStore = window.__streamStore || new Map();
+
+window.registerStreamInfo = function(id, infoObj) {
+    if (id && infoObj) {
+        window.__streamStore.set(String(id), infoObj);
+    }
+};
+
 // Global playXtreamStream helper to cache play info and navigate to the player
-window.playXtreamStream = function(id, rawStreamJsonHex) {
+window.playXtreamStream = function(id, rawStreamInfo) {
     try {
-        const raw = JSON.parse(decodeURIComponent(rawStreamJsonHex));
-        const playInfo = {
-            name: raw.name || raw.title || '',
-            stream_icon: raw.stream_icon || raw.cover || '',
-            category_id: raw.category_id || '',
-            container_extension: raw.container_extension || '',
-            category_name: raw.category_name || ''
-        };
-        sessionStorage.setItem('xtream_play_info', JSON.stringify(playInfo));
+        let raw = rawStreamInfo;
+        if (!raw && id) {
+            raw = window.__streamStore.get(String(id));
+        }
+        if (typeof raw === 'string') {
+            try { raw = JSON.parse(decodeURIComponent(raw)); }
+            catch(e) { try { raw = JSON.parse(raw); } catch(err){} }
+        }
+        if (raw) {
+            const playInfo = {
+                name: raw.name || raw.title || '',
+                stream_icon: raw.stream_icon || raw.cover || '',
+                category_id: raw.category_id || '',
+                container_extension: raw.container_extension || '',
+                category_name: raw.category_name || ''
+            };
+            sessionStorage.setItem('xtream_play_info', JSON.stringify(playInfo));
+        }
     } catch(e) {
         console.error('playXtreamStream error:', e);
     }

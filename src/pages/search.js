@@ -115,8 +115,12 @@ export function renderSearch() {
                             const cardId = `xtream_${ch.type}_${ch.stream_id || ch.series_id}`;
                             const typeLabel = ch.type === 'live' ? 'Canlı' : (ch.type === 'vod' ? 'Film' : 'Dizi');
                             
+                            if (window.registerStreamInfo) {
+                                window.registerStreamInfo(cardId, ch);
+                            }
+
                             html += `
-                                <div onclick="document.getElementById('search-overlay').remove(); window.playXtreamStream('${cardId}', '${encodeURIComponent(JSON.stringify(ch))}')" style="display: flex; align-items: center; background: #1a1a1a; padding: 12px 20px; border-radius: 8px; cursor: pointer; transition: transform 0.2s, background 0.2s;" onmouseover="this.style.background='#2a2a2a'; this.style.transform='scale(1.02)'" onmouseout="this.style.background='#1a1a1a'; this.style.transform='scale(1)'">
+                                <div onclick="document.getElementById('search-overlay').remove(); window.playXtreamStream('${cardId}')" style="display: flex; align-items: center; background: #1a1a1a; padding: 12px 20px; border-radius: 8px; cursor: pointer; transition: transform 0.2s, background 0.2s;" onmouseover="this.style.background='#2a2a2a'; this.style.transform='scale(1.02)'" onmouseout="this.style.background='#1a1a1a'; this.style.transform='scale(1)'">
                                     <img src="${logoUrl}" style="width: 80px; height: 50px; object-fit: contain; margin-right: 20px; background: #000; border-radius: 4px;" onerror="this.src='https://placehold.co/120x80/2a2a35/FFFFFF?text=${encodeURIComponent(fallbackChar)}'">
                                     <div style="flex: 1;">
                                         <h4 style="font-size: 16px; margin: 0 0 5px 0; color: #fff;">${ch.name} <span style="font-size: 10px; background: rgba(255,255,255,0.1); color: #aaa; padding: 2px 5px; border-radius: 3px; margin-left: 10px;">${typeLabel}</span></h4>
