@@ -179,25 +179,55 @@ router.get('/sources', verifyToken, async (req, res) => {
     }
 });
 
+function parseXtreamFromM3uUrl(urlStr) {
+    if (!urlStr) return null;
+    try {
+        const cleanStr = urlStr.trim();
+        const url = new URL(cleanStr);
+        const username = url.searchParams.get('username') || url.searchParams.get('user') || url.searchParams.get('u');
+        const password = url.searchParams.get('password') || url.searchParams.get('pass') || url.searchParams.get('p');
+        if (username && password) {
+            return { server: url.origin, username, password };
+        }
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 4 && ['live', 'movie', 'series'].includes(pathParts[0])) {
+            return { server: url.origin, username: pathParts[1], password: pathParts[2] };
+        }
+        if (pathParts.length >= 3 && ['m3u', 'get', 'playlist', 'get.php'].includes(pathParts[0])) {
+            return { server: url.origin, username: pathParts[1], password: pathParts[2] };
+        }
+        if (pathParts.length === 2 && !pathParts[0].includes('.') && !pathParts[1].includes('.')) {
+            return { server: url.origin, username: pathParts[0], password: pathParts[1] };
+        }
+    } catch (e) {}
+    return null;
+}
+
 // POST a new source (profile)
 router.post('/sources', verifyToken, async (req, res) => {
     try {
-        const { name, m3u_url, source_type, xtream_server, xtream_username, xtream_password } = req.body;
+        let { name, m3u_url, source_type, xtream_server, xtream_username, xtream_password } = req.body;
         
         if (!name) {
             return res.status(400).json({ error: 'Profile name is required' });
         }
 
-        const type = source_type || 'm3u';
+        // Eğer M3U URL verildiyse bunu Xtream yapısına dönüştür
+        if (m3u_url && (!xtream_server || !xtream_username || !xtream_password)) {
+            const parsed = parseXtreamFromM3uUrl(m3u_url);
+            if (parsed) {
+                source_type = 'xtream';
+                xtream_server = parsed.server;
+                xtream_username = parsed.username;
+                xtream_password = parsed.password;
+            }
+        }
 
-        // Xtream için server+user+pass zorunlu, m3u için url zorunlu
+        const type = source_type || 'xtream';
+
         if (type === 'xtream') {
             if (!xtream_server || !xtream_username || !xtream_password) {
                 return res.status(400).json({ error: 'Xtream: server, username and password are required' });
-            }
-        } else {
-            if (!m3u_url) {
-                return res.status(400).json({ error: 'M3U URL is required' });
             }
         }
 

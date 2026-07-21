@@ -25,80 +25,51 @@ export async function renderProfiles() {
             <!-- Add Profile Modal -->
             <div id="add-profile-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 2000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; overflow-y: auto; padding: 20px;">
                 <div class="modal-card" style="background: #181818; padding: 36px; border-radius: 10px; width: 100%; max-width: 540px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); border: 1px solid #2f2f2f; transform: scale(0.9); transition: transform 0.3s ease; margin: auto;">
-                    <h2 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 20px; color: #fff;">Profil Ekle</h2>
+                    <h2 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 6px; color: #fff;">Profil Ekle</h2>
+                    <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 24px; line-height: 1.4;">
+                        M3U linkinizi yapıştırın veya doğrudan Xtream sunucu bilgilerinizi girin.
+                    </p>
 
-                    <!-- Sekme Başlıkları -->
-                    <div style="display: flex; gap: 0; margin-bottom: 28px; background: #111; border-radius: 6px; padding: 3px; border: 1px solid #222;">
-                        <button id="tab-m3u" class="modal-tab active-tab" style="flex: 1; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.2s; background: #E50914; color: #fff;">
-                            📋 M3U / Dosya
-                        </button>
-                        <button id="tab-xtream" class="modal-tab" style="flex: 1; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.2s; background: transparent; color: #888;">
-                            ⚡ Xtream Codes
-                        </button>
-                    </div>
-
-                    <!-- Profil Adı (her iki sekmede ortak) -->
+                    <!-- Profil Adı -->
                     <div style="margin-bottom: 18px;">
                         <label style="display: block; color: #8c8c8c; font-size: 0.8rem; margin-bottom: 7px; font-weight: 600; letter-spacing: 1px;">PROFİL ADI</label>
-                        <input type="text" id="new-profile-name" placeholder="örn: Ev TV, Dizi Listesi" style="width: 100%; padding: 13px 14px; background: #252525; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.95rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#E50914'" onblur="this.style.borderColor='#333'" />
+                        <input type="text" id="new-profile-name" placeholder="örn: Ev TV, Spor" style="width: 100%; padding: 13px 14px; background: #252525; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.95rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#E50914'" onblur="this.style.borderColor='#333'" />
                     </div>
 
-                    <!-- M3U Paneli -->
-                    <div id="panel-m3u">
-                        <div style="margin-bottom: 14px;">
-                            <label style="display: block; color: #8c8c8c; font-size: 0.8rem; margin-bottom: 7px; font-weight: 600; letter-spacing: 1px;">M3U LİNK <span style="color:#555; font-weight:400;">(opsiyonel)</span></label>
-                            <input type="text" id="new-profile-url" placeholder="https://site.com/playlist.m3u?username=X&password=Y" style="width: 100%; padding: 13px 14px; background: #252525; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.9rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#E50914'" onblur="this.style.borderColor='#333'" />
-                            <p style="color: #555; font-size: 0.78rem; margin: 5px 0 0 0;">Sonraki oturumda bu linkten otomatik güncellenir.</p>
-                        </div>
-
-                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
-                            <div style="flex: 1; height: 1px; background: #2a2a2a;"></div>
-                            <span style="color: #444; font-size: 0.78rem; white-space: nowrap;">veya dosya yükle</span>
-                            <div style="flex: 1; height: 1px; background: #2a2a2a;"></div>
-                        </div>
-
-                        <div style="margin-bottom: 20px;">
-                            <label id="file-drop-zone" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 18px; background: #1e1e1e; border: 2px dashed #333; border-radius: 6px; cursor: pointer; transition: all 0.2s; box-sizing: border-box;">
-                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                                </svg>
-                                <span id="file-drop-label" style="color: #555; font-size: 0.88rem;">Dosyayı sürükleyin veya tıklayın</span>
-                                <span style="color: #3a3a3a; font-size: 0.75rem;">.m3u, .m3u8 desteklenir</span>
-                                <input type="file" id="new-profile-file" accept=".m3u,.m3u8,text/plain" style="display: none;" />
-                            </label>
-                        </div>
-
-                        <div id="source-info-box" style="display: none; background: rgba(229,9,20,0.08); border: 1px solid rgba(229,9,20,0.2); border-radius: 5px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.82rem; color: #e57373;"></div>
+                    <!-- M3U Hızlı Giriş Kutusu -->
+                    <div style="margin-bottom: 20px; background: rgba(229,9,20,0.06); border: 1px dashed rgba(229,9,20,0.35); border-radius: 6px; padding: 14px;">
+                        <label style="display: block; color: #E50914; font-size: 0.8rem; margin-bottom: 7px; font-weight: 700; letter-spacing: 1px;">🔗 HIZLI GİRİŞ: M3U LİNKİ YAPIŞTIRIN</label>
+                        <input type="text" id="m3u-quick-url" placeholder="http://sunucu.com:8080/get.php?username=XXX&password=YYY&type=m3u_plus" style="width: 100%; padding: 12px 14px; background: #1e1e1e; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.88rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#E50914'" onblur="this.style.borderColor='#333'" />
+                        <p style="color: #888; font-size: 0.76rem; margin: 6px 0 0 0;">M3U linki yapıştırıldığında sunucu adresi, kullanıcı adı ve şifre otomatik Xtream yapısına aktarılır.</p>
                     </div>
 
-                    <!-- Xtream Paneli -->
-                    <div id="panel-xtream" style="display: none;">
-                        <div style="background: rgba(255,193,7,0.07); border: 1px solid rgba(255,193,7,0.2); border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.83rem; color: #ffc107; line-height: 1.5;">
-                            ⚡ <b>Xtream Codes</b> ile kanallar <b>anında</b> yüklenir — büyük M3U dosyası indirmeye gerek yoktur. Kategoriler lazy-load edilir.
-                        </div>
-
-                        <div style="margin-bottom: 14px;">
-                            <label style="display: block; color: #8c8c8c; font-size: 0.8rem; margin-bottom: 7px; font-weight: 600; letter-spacing: 1px;">SUNUCU ADRESİ</label>
-                            <input type="text" id="xtream-server" placeholder="http://sunucu.com:8080" style="width: 100%; padding: 13px 14px; background: #252525; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.9rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#ffc107'" onblur="this.style.borderColor='#333'" />
-                            <p style="color: #555; font-size: 0.78rem; margin: 5px 0 0 0;">Port numarasıyla birlikte girin. Örn: http://example.com:25461</p>
-                        </div>
-                        <div style="display: flex; gap: 12px; margin-bottom: 14px;">
-                            <div style="flex: 1;">
-                                <label style="display: block; color: #8c8c8c; font-size: 0.8rem; margin-bottom: 7px; font-weight: 600; letter-spacing: 1px;">KULLANICI ADI</label>
-                                <input type="text" id="xtream-username" placeholder="kullanici" style="width: 100%; padding: 13px 14px; background: #252525; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.9rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#ffc107'" onblur="this.style.borderColor='#333'" />
-                            </div>
-                            <div style="flex: 1;">
-                                <label style="display: block; color: #8c8c8c; font-size: 0.8rem; margin-bottom: 7px; font-weight: 600; letter-spacing: 1px;">ŞİFRE</label>
-                                <input type="password" id="xtream-password" placeholder="••••••••" style="width: 100%; padding: 13px 14px; background: #252525; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.9rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#ffc107'" onblur="this.style.borderColor='#333'" />
-                            </div>
-                        </div>
-
-                        <div id="xtream-verify-status" style="display: none; padding: 10px 14px; border-radius: 5px; margin-bottom: 14px; font-size: 0.83rem;"></div>
-
-                        <button id="xtream-verify-btn" style="width: 100%; padding: 11px; background: transparent; border: 1px solid #ffc107; color: #ffc107; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 600; margin-bottom: 16px; transition: all 0.2s;">
-                            🔍 Bağlantıyı Test Et
-                        </button>
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+                        <div style="flex: 1; height: 1px; background: #2a2a2a;"></div>
+                        <span style="color: #666; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px;">VEYA DOĞRUDAN BİLGİLERİ GİRİN</span>
+                        <div style="flex: 1; height: 1px; background: #2a2a2a;"></div>
                     </div>
+
+                    <!-- Xtream Giriş Alanları -->
+                    <div style="margin-bottom: 14px;">
+                        <label style="display: block; color: #8c8c8c; font-size: 0.8rem; margin-bottom: 7px; font-weight: 600; letter-spacing: 1px;">SUNUCU ADRESİ</label>
+                        <input type="text" id="xtream-server" placeholder="http://sunucu.com:8080" style="width: 100%; padding: 13px 14px; background: #252525; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.9rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#ffc107'" onblur="this.style.borderColor='#333'" />
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-bottom: 14px;">
+                        <div style="flex: 1;">
+                            <label style="display: block; color: #8c8c8c; font-size: 0.8rem; margin-bottom: 7px; font-weight: 600; letter-spacing: 1px;">KULLANICI ADI</label>
+                            <input type="text" id="xtream-username" placeholder="kullanici" style="width: 100%; padding: 13px 14px; background: #252525; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.9rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#ffc107'" onblur="this.style.borderColor='#333'" />
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="display: block; color: #8c8c8c; font-size: 0.8rem; margin-bottom: 7px; font-weight: 600; letter-spacing: 1px;">ŞİFRE</label>
+                            <input type="password" id="xtream-password" placeholder="••••••••" style="width: 100%; padding: 13px 14px; background: #252525; border: 1px solid #333; border-radius: 6px; color: white; font-size: 0.9rem; outline: none; box-sizing: border-box; transition: border-color 0.2s;" onfocus="this.style.borderColor='#ffc107'" onblur="this.style.borderColor='#333'" />
+                        </div>
+                    </div>
+
+                    <div id="xtream-verify-status" style="display: none; padding: 10px 14px; border-radius: 5px; margin-bottom: 14px; font-size: 0.83rem;"></div>
+
+                    <button id="xtream-verify-btn" style="width: 100%; padding: 11px; background: transparent; border: 1px solid #ffc107; color: #ffc107; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 600; margin-bottom: 16px; transition: all 0.2s;">
+                        🔍 Bağlantıyı Test Et
+                    </button>
 
                     <!-- Butonlar -->
                     <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 4px;">
@@ -144,17 +115,9 @@ export async function renderProfiles() {
     const manageBtn       = document.getElementById('manage-btn');
     const addModal        = document.getElementById('add-profile-modal');
     const newNameInput    = document.getElementById('new-profile-name');
-    const newUrlInput     = document.getElementById('new-profile-url');
-    const newFileInput    = document.getElementById('new-profile-file');
-    const fileDropZone    = document.getElementById('file-drop-zone');
-    const fileDropLabel   = document.getElementById('file-drop-label');
-    const sourceInfoBox   = document.getElementById('source-info-box');
+    const m3uQuickUrl     = document.getElementById('m3u-quick-url');
     const cancelAddBtn    = document.getElementById('cancel-add-btn');
     const saveProfileBtn  = document.getElementById('save-profile-btn');
-    const tabM3u          = document.getElementById('tab-m3u');
-    const tabXtream       = document.getElementById('tab-xtream');
-    const panelM3u        = document.getElementById('panel-m3u');
-    const panelXtream     = document.getElementById('panel-xtream');
     const xtreamServer    = document.getElementById('xtream-server');
     const xtreamUser      = document.getElementById('xtream-username');
     const xtreamPass      = document.getElementById('xtream-password');
@@ -168,8 +131,6 @@ export async function renderProfiles() {
 
     let isManageMode = false;
     let profiles = [];
-    let selectedFileContent = null;
-    let activeTab = 'm3u'; // 'm3u' | 'xtream'
 
     const avatarGradients = [
         'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)',
@@ -384,34 +345,6 @@ export async function renderProfiles() {
 
     // ──── Modal ─────────────────────────────────────────────────────────────
 
-    function switchTab(tab) {
-        activeTab = tab;
-        if (tab === 'm3u') {
-            tabM3u.style.background = '#E50914';
-            tabM3u.style.color = '#fff';
-            tabXtream.style.background = 'transparent';
-            tabXtream.style.color = '#888';
-            panelM3u.style.display = 'block';
-            panelXtream.style.display = 'none';
-            saveProfileBtn.style.background = '#E50914';
-        } else {
-            tabXtream.style.background = '#ffc107';
-            tabXtream.style.color = '#000';
-            tabM3u.style.background = 'transparent';
-            tabM3u.style.color = '#888';
-            panelXtream.style.display = 'block';
-            panelM3u.style.display = 'none';
-            saveProfileBtn.style.background = '#ffc107';
-            saveProfileBtn.style.color = '#000';
-        }
-    }
-
-    tabM3u.addEventListener('click', () => {
-        switchTab('m3u');
-        saveProfileBtn.style.color = '#fff';
-    });
-    tabXtream.addEventListener('click', () => switchTab('xtream'));
-
     function openAddModal() {
         addModal.style.display = 'flex';
         setTimeout(() => {
@@ -420,19 +353,11 @@ export async function renderProfiles() {
         }, 10);
         // Reset
         newNameInput.value = '';
-        newUrlInput.value = '';
-        newFileInput.value = '';
+        if (m3uQuickUrl) m3uQuickUrl.value = '';
         xtreamServer.value = '';
         xtreamUser.value = '';
         xtreamPass.value = '';
-        selectedFileContent = null;
-        fileDropLabel.textContent = 'Dosyayı sürükleyin veya tıklayın';
-        fileDropLabel.style.color = '#555';
-        fileDropZone.style.borderColor = '#333';
-        sourceInfoBox.style.display = 'none';
         xtreamStatus.style.display = 'none';
-        switchTab('m3u');
-        saveProfileBtn.style.color = '#fff';
         newNameInput.focus();
     }
 
@@ -444,58 +369,52 @@ export async function renderProfiles() {
 
     cancelAddBtn.addEventListener('click', closeAddModal);
 
-    // Dosya seçimi
-    fileDropZone.addEventListener('click', () => newFileInput.click());
-    newFileInput.addEventListener('change', e => {
-        const file = e.target.files[0];
-        if (file) readM3UFile(file);
-    });
-    fileDropZone.addEventListener('dragover', e => { e.preventDefault(); fileDropZone.classList.add('dragover'); });
-    fileDropZone.addEventListener('dragleave', () => fileDropZone.classList.remove('dragover'));
-    fileDropZone.addEventListener('drop', e => {
-        e.preventDefault();
-        fileDropZone.classList.remove('dragover');
-        const file = e.dataTransfer.files[0];
-        if (file) readM3UFile(file);
-    });
-
-    function readM3UFile(file) {
-        const reader = new FileReader();
-        reader.onload = e => {
-            selectedFileContent = e.target.result;
-            fileDropLabel.textContent = `✓ ${file.name} (${(file.size/1024).toFixed(0)} KB)`;
-            fileDropLabel.style.color = '#4caf50';
-            fileDropZone.style.borderColor = '#4caf50';
-            updateInfoBox();
+    // M3U Linki Yapıştırıldığında / Girildiğinde Otomatik Xtream Ayrıştırma
+    if (m3uQuickUrl) {
+        const autoParseM3u = () => {
+            const val = m3uQuickUrl.value.trim();
+            if (!val) return;
+            const parsed = parseXtreamFromM3uUrl(val);
+            if (parsed) {
+                xtreamServer.value = parsed.server;
+                xtreamUser.value = parsed.username;
+                xtreamPass.value = parsed.password;
+                showXtreamStatus(`✅ M3U linkinden Xtream bilgileri başarıyla ayıklandı:\nSunucu: ${parsed.server} | Kullanıcı: ${parsed.username}`, 'success');
+                if (!newNameInput.value.trim()) {
+                    newNameInput.value = parsed.username || 'Xtream IPTV';
+                }
+            } else {
+                showXtreamStatus('⚠️ Girilen M3U linkinden Xtream kullanıcı bilgileri otomatik okunamadı. Lütfen sunucu, kullanıcı adı ve şifreyi kontrol edin.', 'warn');
+            }
         };
-        reader.onerror = () => alert('Dosya okunamadı.');
-        reader.readAsText(file, 'UTF-8');
-    }
 
-    function updateInfoBox() {
-        const hasUrl  = newUrlInput.value.trim().length > 0;
-        const hasFile = !!selectedFileContent;
-        if (hasFile && hasUrl) {
-            sourceInfoBox.style.display = 'block';
-            sourceInfoBox.innerHTML = '📁 <b>Dosyadan yüklenecek.</b> Link saklanacak — sonraki oturumda linkten güncellenir.';
-        } else if (hasFile) {
-            sourceInfoBox.style.display = 'block';
-            sourceInfoBox.innerHTML = '📁 <b>Sadece dosyadan yüklenecek.</b> Link girilmedi, otomatik güncelleme yapılmaz.';
-        } else {
-            sourceInfoBox.style.display = 'none';
-        }
+        m3uQuickUrl.addEventListener('input', autoParseM3u);
+        m3uQuickUrl.addEventListener('paste', () => setTimeout(autoParseM3u, 50));
     }
-    newUrlInput.addEventListener('input', updateInfoBox);
 
     // ──── Xtream Bağlantı Testi ──────────────────────────────────────────────
 
     xtreamVerifyBtn.addEventListener('click', async () => {
-        const srv  = xtreamServer.value.trim();
-        const usr  = xtreamUser.value.trim();
-        const pwd  = xtreamPass.value.trim();
+        let srv  = xtreamServer.value.trim();
+        let usr  = xtreamUser.value.trim();
+        let pwd  = xtreamPass.value.trim();
+
+        // Eğer boşsa ama m3u-quick-url varsa parse et
+        const quickUrl = m3uQuickUrl?.value.trim();
+        if (quickUrl && (!srv || !usr || !pwd)) {
+            const parsed = parseXtreamFromM3uUrl(quickUrl);
+            if (parsed) {
+                srv = parsed.server;
+                usr = parsed.username;
+                pwd = parsed.password;
+                xtreamServer.value = srv;
+                xtreamUser.value = usr;
+                xtreamPass.value = pwd;
+            }
+        }
 
         if (!srv || !usr || !pwd) {
-            showXtreamStatus('Lütfen sunucu, kullanıcı adı ve şifreyi doldurun.', 'error');
+            showXtreamStatus('Lütfen bir M3U linki yapıştırın veya Sunucu, Kullanıcı Adı ve Şifreyi doldurun.', 'error');
             return;
         }
 
@@ -527,7 +446,6 @@ export async function renderProfiles() {
                     : 'Sınırsız';
                 const maxConns = userInfo.max_connections || '?';
                 showXtreamStatus(`✅ Bağlantı başarılı! Bitiş: ${expDate} · Maks bağlantı: ${maxConns}`, 'success');
-                // Profil adını otomatik doldur (boşsa)
                 if (!newNameInput.value.trim()) {
                     newNameInput.value = userInfo.username || srv.replace(/https?:\/\//, '').split(':')[0];
                 }
@@ -549,117 +467,54 @@ export async function renderProfiles() {
             warn:    { bg: 'rgba(255,193,7,0.1)',   border: 'rgba(255,193,7,0.25)',color: '#ffc107' }
         };
         const c = colors[type] || colors.warn;
-        xtreamStatus.style.cssText = `display:block;background:${c.bg};border:1px solid ${c.border};color:${c.color};padding:10px 14px;border-radius:5px;margin-bottom:14px;font-size:0.83rem;`;
+        xtreamStatus.style.cssText = `display:block;background:${c.bg};border:1px solid ${c.border};color:${c.color};padding:10px 14px;border-radius:5px;margin-bottom:14px;font-size:0.83rem;white-space:pre-line;`;
         xtreamStatus.textContent = msg;
-    }
-
-    // URL'den Xtream bilgilerini ayıklayan yardımcı fonksiyon
-    function parseXtreamFromM3uUrl(urlStr) {
-        try {
-            const url = new URL(urlStr);
-            const username = url.searchParams.get('username') || url.searchParams.get('user');
-            const password = url.searchParams.get('password') || url.searchParams.get('pass');
-            if (username && password) {
-                return {
-                    server: url.origin,
-                    username: username,
-                    password: password
-                };
-            }
-        } catch (e) {
-            // Geçersiz URL
-        }
-        return null;
     }
 
     // ──── Kaydet ────────────────────────────────────────────────────────────
 
     saveProfileBtn.addEventListener('click', async () => {
         const name = newNameInput.value.trim();
-        if (!name) { alert('Profil adı giriniz.'); return; }
+        if (!name) { alert('Lütfen profil adı giriniz.'); return; }
 
-        if (activeTab === 'xtream') {
-            // ─ Xtream kaydet
-            const srv = xtreamServer.value.trim();
-            const usr = xtreamUser.value.trim();
-            const pwd = xtreamPass.value.trim();
-            if (!srv || !usr || !pwd) {
-                alert('Sunucu, kullanıcı adı ve şifreyi eksiksiz doldurun.');
+        let srv = xtreamServer.value.trim();
+        let usr = xtreamUser.value.trim();
+        let pwd = xtreamPass.value.trim();
+
+        // M3U quick input varsa ve alanlar boşsa M3U URL'inden otomatik ayrıştır
+        const quickUrl = m3uQuickUrl?.value.trim();
+        if (quickUrl && (!srv || !usr || !pwd)) {
+            const parsed = parseXtreamFromM3uUrl(quickUrl);
+            if (parsed) {
+                srv = parsed.server;
+                usr = parsed.username;
+                pwd = parsed.password;
+            } else {
+                alert('Girdiğiniz M3U linkinden Xtream kullanıcı adı ve şifresi okunamadı. Lütfen geçerli bir IPTV M3U linki yapıştırın veya sunucu/kullanıcı/şifre bilgilerini doldurun.');
                 return;
             }
-            try {
-                saveProfileBtn.disabled = true;
-                saveProfileBtn.textContent = 'Ekleniyor...';
-                const newProfile = await apiClient.addXtreamSource({ name, server: srv, username: usr, password: pwd });
-                closeAddModal();
-                await loadProfiles();
-                // Xtream profili hemen aktif et ve yönlendir
-                xtreamAPI.saveActiveXtreamProfile(newProfile);
-                localStorage.setItem('iptv_active_source_id', newProfile.id);
-                window.location.hash = '#/home';
-            } catch (e) {
-                alert('Xtream profil eklenemedi: ' + e.message);
-            } finally {
-                saveProfileBtn.disabled = false;
-                saveProfileBtn.textContent = 'Kaydet';
-                saveProfileBtn.style.color = '#000';
-            }
-        } else {
-            // ─ M3U kaydet (ya da URL Xtream ise otomatik olarak Xtream kaydet)
-            const url = newUrlInput.value.trim();
-            const hasFile = !!selectedFileContent;
-            if (!url && !hasFile) {
-                alert('M3U linki girin veya dosya seçin.');
-                return;
-            }
+        }
 
-            // Eğer girilen URL bir Xtream M3U linkiyse (username ve password içeriyorsa) otomatik dönüştür
-            if (url && !hasFile) {
-                const xtreamInfo = parseXtreamFromM3uUrl(url);
-                if (xtreamInfo) {
-                    console.log('M3U link is actually an Xtream server, saving as Xtream profile:', xtreamInfo);
-                    try {
-                        saveProfileBtn.disabled = true;
-                        saveProfileBtn.textContent = 'Ekleniyor (Xtream)...';
-                        const newProfile = await apiClient.addXtreamSource({
-                            name,
-                            server: xtreamInfo.server,
-                            username: xtreamInfo.username,
-                            password: xtreamInfo.password
-                        });
-                        closeAddModal();
-                        await loadProfiles();
-                        // Xtream profili hemen aktif et ve yönlendir
-                        xtreamAPI.saveActiveXtreamProfile(newProfile);
-                        localStorage.setItem('iptv_active_source_id', newProfile.id);
-                        window.location.hash = '#/home';
-                        return;
-                    } catch (e) {
-                        console.warn('Xtream olarak ekleme başarısız oldu, normal M3U olarak denenecek...', e);
-                    } finally {
-                        saveProfileBtn.disabled = false;
-                        saveProfileBtn.textContent = 'Kaydet';
-                    }
-                }
-            }
+        if (!srv || !usr || !pwd) {
+            alert('Lütfen bir M3U linki yapıştırın veya Sunucu, Kullanıcı Adı ve Şifre alanlarını doldurun.');
+            return;
+        }
 
-            try {
-                saveProfileBtn.disabled = true;
-                saveProfileBtn.textContent = 'Ekleniyor...';
-                const newProfile = await apiClient.addSource({ name, m3u_url: url || null });
-                closeAddModal();
-                if (hasFile) {
-                    await startSync(newProfile, selectedFileContent);
-                } else {
-                    await startSync(newProfile, null);
-                }
-            } catch (e) {
-                alert('Profil eklenemedi: ' + e.message);
-            } finally {
-                saveProfileBtn.disabled = false;
-                saveProfileBtn.textContent = 'Kaydet';
-                saveProfileBtn.style.color = '#fff';
-            }
+        try {
+            saveProfileBtn.disabled = true;
+            saveProfileBtn.textContent = 'Ekleniyor...';
+            const newProfile = await apiClient.addXtreamSource({ name, server: srv, username: usr, password: pwd });
+            closeAddModal();
+            await loadProfiles();
+            // Xtream profili hemen aktif et ve yönlendir
+            xtreamAPI.saveActiveXtreamProfile(newProfile);
+            localStorage.setItem('iptv_active_source_id', newProfile.id);
+            window.location.hash = '#/home';
+        } catch (e) {
+            alert('Xtream profil eklenemedi: ' + e.message);
+        } finally {
+            saveProfileBtn.disabled = false;
+            saveProfileBtn.textContent = 'Kaydet';
         }
     });
 

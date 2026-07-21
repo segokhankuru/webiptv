@@ -175,9 +175,8 @@ export async function renderPlayer(channelId) {
             const profile = xtreamAPI.getActiveXtreamProfile();
             if (!profile) throw new Error('Aktif Xtream profili bulunamadı.');
             
-            // Force m3u8 for live streams to ensure compatibility with HLS players (especially Safari/mobile),
-            // even if the stored container_extension is 'ts' (e.g. from previous versions or legacy favorites)
-            const ext = (type === 'live') ? 'm3u8' : (playInfo.container_extension || 'mp4');
+            // Live yayınlar için Xtream varsayılanı 'ts' dir. Sunucudan özel container_extension gelmişse onu kullanır.
+            const ext = (type === 'live') ? (playInfo.container_extension || 'ts') : (playInfo.container_extension || 'mp4');
             const streamUrl = xtreamAPI.buildStreamUrl(profile.server_url, profile.username, profile.password, streamId, type, ext);
             
             channel = {
@@ -675,17 +674,15 @@ export async function renderPlayer(channelId) {
                     return window.MatroskaSubtitles;
                 }
                 
-                const proxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://unpkg.com/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
-                const fallbackProxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://cdn.jsdelivr.net/npm/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js');
+                const directCdnUrl = 'https://cdn.jsdelivr.net/npm/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js';
+                const fallbackCdnUrl = 'https://unpkg.com/matroska-subtitles@3.3.2/dist/matroska-subtitles.min.js';
                 
                 const tryFetchAndEval = async (url) => {
                     const response = await fetch(url);
                     if (!response.ok) throw new Error(`Status ${response.status}`);
                     let codeText = await response.text();
                     
-                    // Kütüphane new Function local scope'unda çalıştığı için global window nesnesine atama yapıyoruz!
                     codeText += "\nif (typeof MatroskaSubtitles !== 'undefined') { window.MatroskaSubtitles = MatroskaSubtitles; }";
-                    
                     (new Function(codeText))();
                     
                     if (!window.MatroskaSubtitles) {
@@ -695,11 +692,10 @@ export async function renderPlayer(channelId) {
                 };
 
                 try {
-                    return await tryFetchAndEval(proxyUrl);
+                    return await tryFetchAndEval(directCdnUrl);
                 } catch (err) {
-                    console.warn("Yerel proxy üzerinden parser yüklenemedi, fallback deneniyor...", err);
                     try {
-                        return await tryFetchAndEval(fallbackProxyUrl);
+                        return await tryFetchAndEval(fallbackCdnUrl);
                     } catch (fallbackErr) {
                         throw new Error("Altyazı kütüphanesi yüklenemedi: " + fallbackErr.message);
                     }
@@ -720,13 +716,15 @@ export async function renderPlayer(channelId) {
             const subtitleOverlay = document.getElementById('subtitle-overlay');
 
             const startMatroskaParser = async () => {
-                if (xtreamSubsLoaded) return; // Yarış durumunu engelle
+                if (xtreamSubsLoaded) return;
+                // Yalnızca MKV dosyalarında ve tarayıcı ortamında çalıştır (mobil bellek taşmasını önle)
+                if (!urlLower.endsWith('.mkv') && !urlLower.includes('.mkv?')) return;
                 try {
                     const MatroskaSubtitles = await loadMatroskaParser();
                     const parser = new MatroskaSubtitles.SubtitleParser();
                     
                     parser.on('tracks', (tracks) => {
-                        if (xtreamSubsLoaded) return; // Yarış durumunu engelle
+                        if (xtreamSubsLoaded) return;
                         const subTracks = tracks.filter(t => t.type === 'subtitle');
                         if (subTracks.length > 0) {
                             subtitleContainer.style.display = 'block';
@@ -757,6 +755,8 @@ export async function renderPlayer(channelId) {
                     isReading = true;
                     const response = await fetch(playUrl);
                     reader = response.body.getReader();
+                    let bytesRead = 0;
+                    const maxBytes = 10 * 1024 * 1024; // Maksimum 10MB başlık tara
 
                     while (isReading) {
                         if (video.paused) {
@@ -766,9 +766,13 @@ export async function renderPlayer(channelId) {
                         const { done, value } = await reader.read();
                         if (done) break;
                         
+                        bytesRead += value.byteLength || value.length || 0;
                         parser.write(value);
-                        await new Promise(r => setTimeout(r, 10)); // CPU'yu korumak için hafif bekleme
+
+                        if (bytesRead >= maxBytes) break;
+                        await new Promise(r => setTimeout(r, 10));
                     }
+                    if (reader) reader.cancel();
                 } catch (err) {
                     console.log("Matroska altyazıları çözülemedi veya stream okunamadı:", err.message);
                 }
@@ -864,8 +868,8 @@ export async function renderPlayer(channelId) {
             // mpegts.js — Canlı TV (TS ve uzantısız) yayınları için
             const loadMpegts = async () => {
                 if (window.mpegts) return window.mpegts;
-                const proxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://unpkg.com/mpegts.js@1.7.3/dist/mpegts.min.js');
-                const fallbackProxyUrl = '/api/proxy/m3u?url=' + encodeURIComponent('https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.min.js');
+                const directCdnUrl = 'https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.min.js';
+                const fallbackCdnUrl = 'https://unpkg.com/mpegts.js@1.7.3/dist/mpegts.min.js';
                 
                 const tryLoad = async (url) => {
                     const res = await fetch(url);
@@ -877,9 +881,9 @@ export async function renderPlayer(channelId) {
                 };
 
                 try {
-                    return await tryLoad(proxyUrl);
+                    return await tryLoad(directCdnUrl);
                 } catch (e) {
-                    return await tryLoad(fallbackProxyUrl);
+                    return await tryLoad(fallbackCdnUrl);
                 }
             };
 
@@ -912,7 +916,15 @@ export async function renderPlayer(channelId) {
                 }
             }).catch(err => {
                 console.error("mpegts init failed, falling back to native:", err);
-                video.src = playUrl;
+                // Safari iOS için HLS (.m3u8) fallback dene
+                let safariPlayUrl = playUrl;
+                if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    safariPlayUrl = playUrl.replace(/\.ts($|\?)/, '.m3u8$1');
+                    if (!safariPlayUrl.includes('.m3u8')) {
+                        safariPlayUrl += '.m3u8';
+                    }
+                }
+                video.src = safariPlayUrl;
                 video.play().catch(() => {
                     playPauseBtn.innerHTML = icons.play;
                 });

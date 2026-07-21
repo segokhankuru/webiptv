@@ -227,6 +227,62 @@ export function saveActiveXtreamProfile(profile) {
 }
 
 /**
+ * M3U URL adresinden Xtream sunucu, kullanıcı adı ve şifresini ayıklar
+ * @param {string} urlStr 
+ * @returns {{server: string, username: string, password: string}|null}
+ */
+export function parseXtreamFromM3uUrl(urlStr) {
+    if (!urlStr) return null;
+    try {
+        const cleanStr = urlStr.trim();
+        const url = new URL(cleanStr);
+        
+        // 1. Query String parametreleri: username/user/u & password/pass/p
+        const username = url.searchParams.get('username') || url.searchParams.get('user') || url.searchParams.get('u');
+        const password = url.searchParams.get('password') || url.searchParams.get('pass') || url.searchParams.get('p');
+        
+        if (username && password) {
+            return {
+                server: url.origin,
+                username,
+                password
+            };
+        }
+
+        // 2. Path bazlı parametreler: örn /live/user/pass/123.m3u8, /movie/user/pass/123.mp4
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 4 && ['live', 'movie', 'series'].includes(pathParts[0])) {
+            return {
+                server: url.origin,
+                username: pathParts[1],
+                password: pathParts[2]
+            };
+        }
+
+        // 3. Path bazlı parametreler: örn /get.php/user/pass, /m3u/user/pass
+        if (pathParts.length >= 3 && ['m3u', 'get', 'playlist', 'get.php'].includes(pathParts[0])) {
+            return {
+                server: url.origin,
+                username: pathParts[1],
+                password: pathParts[2]
+            };
+        }
+
+        // 4. Doğrudan path /user/pass
+        if (pathParts.length === 2 && !pathParts[0].includes('.') && !pathParts[1].includes('.')) {
+            return {
+                server: url.origin,
+                username: pathParts[0],
+                password: pathParts[1]
+            };
+        }
+    } catch (e) {
+        // Geçersiz URL
+    }
+    return null;
+}
+
+/**
  * Aktif profil Xtream mı diye kontrol eder
  */
 export function isXtreamProfile() {
@@ -245,5 +301,7 @@ export const xtreamAPI = {
     buildStreamUrl,
     getActiveXtreamProfile,
     saveActiveXtreamProfile,
-    isXtreamProfile
+    isXtreamProfile,
+    parseXtreamFromM3uUrl
 };
+
