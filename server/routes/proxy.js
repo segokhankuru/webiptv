@@ -109,6 +109,8 @@ router.get('/stream', async (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).json({ error: 'url parametresi gerekli' });
 
+    let reader = null;
+
     try {
         const headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -137,25 +139,141 @@ router.get('/stream', async (req, res) => {
 
         // Body'yi stream olarak pipe et (büyük dosyaları RAM'e yüklemeden)
         if (upstream.body) {
-            const reader = upstream.body.getReader();
+            reader = upstream.body.getReader();
             const nodeStream = new Readable({
                 async read() {
-                    const { done, value } = await reader.read();
-                    if (done) this.push(null);
-                    else this.push(Buffer.from(value));
+                    try {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                            this.push(null);
+                        } else {
+                            this.push(Buffer.from(value));
+                        }
+                    } catch (readErr) {
+                        // Upstream bağlantı kopması (ECONNRESET, UND_ERR_SOCKET vb.)
+                        // Bu hatayı yakalayıp stream'i düzgünce kapatıyoruz, sunucu çökmez
+                        console.warn('Stream read error (upstream dropped):', readErr.message);
+                        this.push(null); // Stream'i temiz şekilde kapat
+                    }
                 }
             });
+
+            // Stream hatalarını yakala — sunucu çökmesini engelle
+            nodeStream.on('error', (err) => {
+                console.warn('Stream pipe error:', err.message);
+                if (!res.headersSent) res.status(502).end();
+                else res.end();
+            });
+
             nodeStream.pipe(res);
-            req.on('close', () => reader.cancel());
+
+            // İstemci bağlantıyı kapatırsa upstream reader'ı iptal et
+            req.on('close', () => {
+                try { if (reader) reader.cancel(); } catch(e) {}
+            });
         } else {
             res.end();
         }
     } catch (err) {
         console.error('Stream Proxy Error:', err.message);
+        if (reader) { try { reader.cancel(); } catch(e) {} }
         if (!res.headersSent) {
             res.status(502).json({ error: 'Stream proxy failed: ' + err.message });
         } else {
             res.end();
+        }
+    }
+});
+/**
+ * HLS Proxy — iOS Safari için m3u8 playlist proxy.
+ * 
+ * Sorun: iOS Safari MSE desteklemez, sadece native HLS oynatır.
+ * Native HLS oynatıcı m3u8 içindeki segment URL'lerini doğrudan çeker.
+ * Eğer segment URL'leri http:// ise mixed content engeli, farklı domain ise CORS engeli oluşur.
+ * 
+ * Çözüm: Bu endpoint m3u8 dosyasını sunucu tarafında fetch eder,
+ * içindeki tüm segment URL'lerini /api/proxy/stream üzerinden geçecek şekilde yeniden yazar.
+ * Böylece Safari her şeyi aynı origin'den çeker.
+ */
+router.get('/hls', async (req, res) => {
+    const targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).json({ error: 'url parametresi gerekli' });
+
+    try {
+        console.log(`📱 [HLS Proxy] Fetching: ${targetUrl}`);
+        const response = await fetch(targetUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': '*/*'
+            },
+            signal: AbortSignal.timeout(10000)
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        console.log(`📱 [HLS Proxy] Response: ${response.status}, Content-Type: ${contentType}`);
+
+        if (!response.ok) throw new Error(`Upstream ${response.status}`);
+
+        const m3u8Text = await response.text();
+        
+        // Yanıtın gerçekten bir m3u8 dosyası olup olmadığını kontrol et
+        const isValidM3u8 = m3u8Text.trimStart().startsWith('#EXTM3U');
+        console.log(`📱 [HLS Proxy] Valid m3u8: ${isValidM3u8}, Content length: ${m3u8Text.length}`);
+        console.log(`📱 [HLS Proxy] İlk 300 karakter:\n${m3u8Text.substring(0, 300)}`);
+        
+        if (!isValidM3u8) {
+            // Sunucu m3u8 değil TS stream döndürüyor — doğrudan stream proxy'ye yönlendir
+            console.log(`📱 [HLS Proxy] ❌ Geçerli m3u8 değil! /api/proxy/stream'e yönlendiriliyor...`);
+            return res.redirect(`/api/proxy/stream?url=${encodeURIComponent(targetUrl)}`);
+        }
+
+        // Base URL hesapla (relative path'leri çözmek için)
+        const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+
+        // m3u8 içindeki her satırı işle
+        const rewrittenLines = m3u8Text.split('\n').map(line => {
+            const trimmed = line.trim();
+
+            // Boş satır veya yorum/tag satırı → olduğu gibi bırak
+            if (!trimmed || trimmed.startsWith('#')) {
+                // EXT-X-MAP veya EXT-X-KEY gibi URI= içeren tag'lerdeki URL'leri de yeniden yaz
+                if (trimmed.includes('URI="')) {
+                    return trimmed.replace(/URI="([^"]+)"/g, (match, uri) => {
+                        const absoluteUri = uri.startsWith('http') ? uri : baseUrl + uri;
+                        return `URI="/api/proxy/stream?url=${encodeURIComponent(absoluteUri)}"`;
+                    });
+                }
+                return line;
+            }
+
+            // Segment URL satırı → proxy'ye yönlendir
+            let segmentUrl = trimmed;
+            if (segmentUrl.startsWith('http://') || segmentUrl.startsWith('https://')) {
+                // Absolute URL
+                return `/api/proxy/stream?url=${encodeURIComponent(segmentUrl)}`;
+            } else if (segmentUrl.startsWith('/')) {
+                // Root-relative URL → origin + path
+                try {
+                    const origin = new URL(targetUrl).origin;
+                    return `/api/proxy/stream?url=${encodeURIComponent(origin + segmentUrl)}`;
+                } catch(e) {
+                    return `/api/proxy/stream?url=${encodeURIComponent(baseUrl + segmentUrl)}`;
+                }
+            } else {
+                // Relative URL
+                return `/api/proxy/stream?url=${encodeURIComponent(baseUrl + segmentUrl)}`;
+            }
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cache-Control', 'no-cache, no-store');
+        res.send(rewrittenLines.join('\n'));
+
+    } catch (err) {
+        console.error('HLS Proxy Error:', err.message);
+        if (!res.headersSent) {
+            res.status(502).json({ error: 'HLS proxy failed: ' + err.message });
         }
     }
 });

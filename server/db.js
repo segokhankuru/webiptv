@@ -257,7 +257,12 @@ export const initDb = () => {
                 try {
                     await pool.query(sql);
                 } catch (stmtErr) {
-                    // Tek bir statement hata verirse devam et (tablo zaten varsa vs.)
+                    // Kimlik doğrulama veya bağlantı hatası durumunda döngüyü kır, 16 kez tekrar deneme yapma
+                    if (stmtErr.code === '28P01' || stmtErr.message.includes('ECIRCUITBREAKER') || stmtErr.message.includes('authentication failures')) {
+                        console.error(`Database Auth Failure: ${stmtErr.message}`);
+                        break;
+                    }
+                    // Tek bir statement uyarısı (tablo zaten varsa vs.)
                     console.warn(`Migration statement warning: ${stmtErr.message}`);
                 }
             }

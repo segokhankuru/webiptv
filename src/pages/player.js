@@ -415,9 +415,22 @@ export async function renderPlayer(channelId) {
                     if (bigPlayBtn) bigPlayBtn.style.display = 'none';
                     playPauseBtn.innerHTML = icons.pause;
                 }).catch(err => {
-                    console.log('Mobile autoplay blocked:', err);
-                    if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
-                    playPauseBtn.innerHTML = icons.play;
+                    console.log('Mobile autoplay blocked, trying muted play:', err?.message || err);
+                    if (!video.muted) {
+                        video.muted = true;
+                        video.play().then(() => {
+                            if (bigPlayBtn) bigPlayBtn.style.display = 'none';
+                            playPauseBtn.innerHTML = icons.pause;
+                            showToast('📢 Yayın sessiz başlatıldı. Sesi açmak için dokunun');
+                        }).catch(err2 => {
+                            console.log('Muted autoplay also blocked:', err2?.message || err2);
+                            if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
+                            playPauseBtn.innerHTML = icons.play;
+                        });
+                    } else {
+                        if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
+                        playPauseBtn.innerHTML = icons.play;
+                    }
                 });
             }
         };
@@ -563,10 +576,27 @@ export async function renderPlayer(channelId) {
 
         const rawUrl = channel.streamUrl;
         
-        // HTTP yayınları Cloudflare Worker üzerinden HTTPS proxy yaparak oynatıyoruz
+        // iOS Safari tespiti
+        const isIOSSafari = /iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.MediaSource;
+        const isPageHTTPS = window.location.protocol === 'https:';
+        
+        // HTTP yayınları proxy üzerinden oynatıyoruz
         let playUrl = rawUrl;
         if (rawUrl && rawUrl.startsWith('http://')) {
-            playUrl = `https://webiptv.se-gokhankuru.workers.dev/http/${rawUrl.substring(7)}`;
+            if (isIOSSafari && !isPageHTTPS) {
+                // iOS + HTTP sayfa (yerel ağ testi): Proxy kullanma, doğrudan URL kullan!
+                // Video elementleri cross-origin HTTP kaynakları CORS kısıtlaması olmadan yükleyebilir.
+                // Proxy araya girdiğinde "Media failed to decode" hatası oluşuyordu.
+                playUrl = rawUrl;
+                console.log('📱 [iOS] HTTP sayfa — proxy yok, doğrudan URL kullanılıyor');
+            } else if (isPageHTTPS) {
+                // HTTPS sayfa (Vercel/production): Mixed content engeli var, proxy şart
+                playUrl = `https://webiptv.se-gokhankuru.workers.dev/http/${rawUrl.substring(7)}`;
+                console.log('🌐 HTTPS sayfa — CF Worker proxy kullanılıyor');
+            } else {
+                // Masaüstü + HTTP sayfa: CF Worker proxy (HLS.js ve mpegts.js kendi fetch'lerini yapar)
+                playUrl = `https://webiptv.se-gokhankuru.workers.dev/http/${rawUrl.substring(7)}`;
+            }
         }
 
         /**
@@ -581,7 +611,61 @@ export async function renderPlayer(channelId) {
         const isTs = !isDirectVideo && !isHls;
 
         if (isDirectVideo) {
-            // Native video player — MKV, MP4 ve diğer doğrudan dosyalar
+            // iOS Safari sadece MP4, MOV, M4V oynatabilir. MKV, AVI, FLV, WMV desteklenmez.
+            // Xtream Codes sunucuları .m3u8 uzantısıyla aynı içeriği HLS olarak sunabilir.
+            const iosSupportedNatively = /\.(mp4|mov|m4v|3gp)$/i.test(urlLower);
+            
+            if (isIOSSafari && !iosSupportedNatively) {
+                // MKV/AVI/FLV/WMV — iOS Safari bu container formatlarını desteklemez.
+                // Ama codec (H.264/AAC) destekleniyorsa doğrudan URL ile açılabilir.
+                console.log(`📱 [iOS] Desteklenmeyen format (${urlLower.split('.').pop()}).`);
+                console.log(`📱 [iOS] Orijinal: ${rawUrl}`);
+                
+                // Önce doğrudan deneme: codec destekleniyorsa Safari açabilir
+                video.src = playUrl; // HTTP'de rawUrl, HTTPS'de proxy URL
+                video.muted = true;
+                video.setAttribute('playsinline', '');
+                video.load();
+                
+                video.addEventListener('loadeddata', () => {
+                    console.log('📱 [iOS] ✅ Video yüklendi! Oynatılıyor...');
+                    if (bigPlayBtn) bigPlayBtn.style.display = 'none';
+                    playPauseBtn.innerHTML = icons.pause;
+                    showToast('📢 Sesi açmak için ekrana dokunun');
+                }, { once: true });
+                
+                video.addEventListener('error', () => {
+                    const errCode = video.error ? video.error.code : 'unknown';
+                    const errMsg = video.error ? video.error.message : '';
+                    console.error(`📱 [iOS] Format hatası: Code ${errCode}: ${errMsg}`);
+                    
+                    // Fallback: .mp4 uzantısını dene
+                    const mp4RawUrl = rawUrl.replace(/\.(mkv|avi|flv|wmv|webm|ogv)(\?|$)/i, '.mp4$2');
+                    const mp4PlayUrl = isPageHTTPS 
+                        ? `https://webiptv.se-gokhankuru.workers.dev/http/${mp4RawUrl.substring(7)}`
+                        : mp4RawUrl;
+                    console.log(`📱 [iOS] Fallback: MP4 deneniyor: ${mp4RawUrl}`);
+                    video.src = mp4PlayUrl;
+                    video.load();
+                    video.play().catch(() => {
+                        if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
+                        playPauseBtn.innerHTML = icons.play;
+                        showToast('Bu format iOS\'da oynatılamıyor. Masaüstünde deneyin.');
+                    });
+                }, { once: true });
+                
+                video.play().catch(err => {
+                    console.log('📱 [iOS] Autoplay engellendi:', err?.message);
+                    if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
+                    playPauseBtn.innerHTML = icons.play;
+                });
+                
+                // Cleanup
+                window.__currentPageCleanup = function() {};
+                return;
+            }
+            
+            // Masaüstü veya iOS native destekli format (MP4/MOV)
             video.src = playUrl;
 
             // ── Xtream API Entegrasyonu (Gelişmiş Otomatik Altyazı Arama) ──
@@ -907,11 +991,14 @@ export async function renderPlayer(channelId) {
             };
 
             video.addEventListener('error', () => {
-                console.warn("Video element error:", video.error);
+                const errCode = video.error ? video.error.code : 'unknown';
+                const errMessage = video.error ? video.error.message : '';
+                console.error(`📱 [Video Error] Code ${errCode}: ${errMessage} (Current src: ${video.src})`);
                 if (!videoErrorFallbackTried && rawUrl) {
                     videoErrorFallbackTried = true;
-                    console.log("Direct video failed, trying backend proxy fallback...");
+                    console.log("📱 Direct video failed, trying backend proxy stream fallback...");
                     const fbUrl = getFallbackProxyUrl(rawUrl);
+                    console.log("📱 Proxy URL set:", fbUrl);
                     video.src = fbUrl;
                     safePlay();
                     return;
@@ -928,7 +1015,67 @@ export async function renderPlayer(channelId) {
             };
 
         } else if (isTs) {
-            // mpegts.js — Canlı TV (TS ve uzantısız) yayınları için
+            // iOS Safari & MSE (MediaSource Extensions) Desteklemeyen Cihazlar Kontrolü
+            const hasNativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
+            const hasMSE = typeof window.MediaSource !== 'undefined';
+
+            if (hasNativeHls && !hasMSE) {
+                // iOS Safari: MSE yok, native HLS oynatıcı kullan.
+                // Xtream Codes sunucularında .ts → .m3u8 dönüşümü desteklenir
+                let hlsRawUrl = rawUrl;
+                if (hlsRawUrl.includes('.ts')) {
+                    hlsRawUrl = hlsRawUrl.replace(/\.ts($|\?)/, '.m3u8$1');
+                } else if (!hlsRawUrl.includes('.m3u8')) {
+                    hlsRawUrl += '.m3u8';
+                }
+                
+                let safariPlayUrl;
+                if (!isPageHTTPS) {
+                    // HTTP sayfa (yerel test): Doğrudan IPTV sunucu URL'sini kullan — proxy yok!
+                    // Safari native HLS player segment'leri doğrudan IPTV sunucudan çeker.
+                    safariPlayUrl = hlsRawUrl;
+                    console.log("📱 [iOS Safari] HTTP sayfa — doğrudan m3u8 URL kullanılıyor (proxy yok)");
+                } else {
+                    // HTTPS sayfa (Vercel): Backend HLS proxy kullan (mixed content engeli var)
+                    safariPlayUrl = `/api/proxy/hls?url=${encodeURIComponent(hlsRawUrl)}`;
+                    console.log("📱 [iOS Safari] HTTPS sayfa — Backend HLS proxy kullanılıyor");
+                }
+                
+                console.log("📱 [iOS Safari] Oynatılan URL:", safariPlayUrl);
+                
+                video.src = safariPlayUrl;
+                video.muted = true; // iOS autoplay politikası: önce sessiz başlat
+                video.setAttribute('playsinline', '');
+                
+                video.addEventListener('loadeddata', () => {
+                    console.log("📱 [iOS Safari] ✅ Video yüklendi! Oynatılıyor...");
+                    if (bigPlayBtn) bigPlayBtn.style.display = 'none';
+                    playPauseBtn.innerHTML = icons.pause;
+                    showToast('📢 Sesi açmak için ekrana dokunun');
+                }, { once: true });
+                
+                video.addEventListener('error', () => {
+                    const errCode = video.error ? video.error.code : 'unknown';
+                    const errMsg = video.error ? video.error.message : '';
+                    console.error(`📱 [iOS Safari] Video hata! Code: ${errCode}, Msg: ${errMsg}`);
+                    showToast('Canlı yayın yüklenemedi.');
+                    if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
+                    playPauseBtn.innerHTML = icons.play;
+                }, { once: true });
+                
+                video.load();
+                video.play().catch(err => {
+                    console.log("📱 [iOS Safari] Autoplay engellendi:", err?.message);
+                    if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
+                    playPauseBtn.innerHTML = icons.play;
+                });
+                
+                // Cleanup
+                window.__currentPageCleanup = function() {};
+                return;
+            }
+
+            // mpegts.js — MSE destekleyen tarayıcılarda Canlı TV (TS ve uzantısız) yayınları için
             const loadMpegts = async () => {
                 if (window.mpegts) return window.mpegts;
                 const directCdnUrl = 'https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.min.js';
@@ -1161,10 +1308,23 @@ export async function renderPlayer(channelId) {
             };
             
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Safari native HLS
-            video.src = playUrl;
+            // Safari native HLS — m3u8 dosyaları için
+            if (isIOSSafari && rawUrl.startsWith('http://')) {
+                // iOS: m3u8 segment URL'lerini yeniden yazan HLS proxy kullan
+                const hlsProxyUrl = `/api/proxy/hls?url=${encodeURIComponent(rawUrl)}`;
+                console.log('📱 [iOS Safari Native HLS] Backend HLS proxy:', hlsProxyUrl);
+                video.src = hlsProxyUrl;
+            } else {
+                video.src = playUrl;
+            }
+            video.muted = true;
+            video.setAttribute('playsinline', '');
+            video.load();
             video.addEventListener('loadedmetadata', () => {
-                video.play();
+                video.play().catch(() => {
+                    if (bigPlayBtn) bigPlayBtn.style.display = 'flex';
+                    playPauseBtn.innerHTML = icons.play;
+                });
             });
         }
 

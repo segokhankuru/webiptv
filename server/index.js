@@ -28,6 +28,25 @@ app.use('/api/channels', channelRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Mobil / İstemci canlı konsol & hata akışı (Terminal çıktı servisi)
+app.post('/api/remote-log', (req, res) => {
+    const { level, args = [], stack, url, ua } = req.body || {};
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(ua || '');
+    const tag = isMobile ? '📱 [iPhone/Mobile]' : '💻 [Client]';
+    
+    // Renk kodları: Hata (Kırmızı), Uyarı (Sarı), Bilgi (Mavi/Yeşil)
+    const color = level === 'error' ? '\x1b[31m' : level === 'warn' ? '\x1b[33m' : '\x1b[36m';
+    const reset = '\x1b[0m';
+    
+    const message = args.join(' ');
+    console.log(`${color}${tag} [${(level || 'LOG').toUpperCase()}]: ${message}${reset}`);
+    if (stack) {
+        console.log(`   ${color}└─ Stack: ${stack}${reset}`);
+    }
+    res.status(200).send('OK');
+});
+
+
 // Health check — authentication gerektirmez, DB bağlantısını doğrudan test eder
 app.get('/api/health', async (req, res) => {
     try {

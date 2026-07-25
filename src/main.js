@@ -3,6 +3,10 @@ import './styles/login.css';
 import './styles/netflix.css';
 import { initRouter } from './router.js';
 import { apiClient } from './services/api-client.js';
+import { initRemoteLogger } from './services/remote-logger.js';
+
+initRemoteLogger();
+
 
 window.__streamStore = window.__streamStore || new Map();
 
