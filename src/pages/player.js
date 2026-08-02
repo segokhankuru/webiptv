@@ -182,8 +182,10 @@ export async function renderPlayer(channelId) {
             const profile = xtreamAPI.getActiveXtreamProfile();
             if (!profile) throw new Error('Aktif Xtream profili bulunamadı.');
             
-            // Live yayınlar için Xtream varsayılanı 'ts' dir. Sunucudan özel container_extension gelmişse onu kullanır.
-            const ext = (type === 'live') ? (playInfo.container_extension || 'ts') : (playInfo.container_extension || 'mp4');
+            // Live yayınlar için HLS (m3u8) formatını kullan. HTTPS (Vercel) ortamında TS stream'leri
+            // CF Worker proxy timeout/bant genişliği limitine takılır. HLS segment bazlı çalıştığı için sorunsuz geçer.
+            // Xtream Codes sunucuları aynı stream'i hem .ts hem .m3u8 olarak sunar.
+            const ext = (type === 'live') ? (playInfo.container_extension || 'm3u8') : (playInfo.container_extension || 'mp4');
             const streamUrl = xtreamAPI.buildStreamUrl(profile.server_url, profile.username, profile.password, streamId, type, ext);
             
             channel = {
