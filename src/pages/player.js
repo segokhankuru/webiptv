@@ -1161,32 +1161,27 @@ export async function renderPlayer(channelId) {
 
         } else if (Hls.isSupported()) {
             // HLS.js — m3u8, canlı TV, Xtream ve uzantısız/bilinmeyen tüm yayınlar
-            const CF_WORKER = 'https://webiptv.se-gokhankuru.workers.dev';
+            // Backend proxy kullanılır. CF Worker canlı stream'lerde 403 döndürüyor.
+            const BACKEND_PROXY = '/api/proxy/stream';
             const originalHost = (() => {
                 try { return new URL(rawUrl).host; } catch(e) { return null; }
             })();
+            const originalOrigin = (() => {
+                try { return new URL(rawUrl).origin; } catch(e) { return null; }
+            })();
 
-            // Özel proxy loader: HLS.js'in her XHR isteğinden önce URL'yi yakalar ve düzeltir.
-            // fetchSetup aksine bu yöntem XHR tabanlı varsayılan loader ile de çalışır.
+            // Özel proxy loader: HLS.js'in her XHR isteğinden önce URL'yi yakalar,
+            // backend /api/proxy/stream üzerinden yönlendirir.
+            // rawUrl kullanıldığı için HLS.js relative path'leri doğru resolve eder
+            // ve sonuçta hep http:// URL'ler üretir → burada backend proxy'ye çevrilir.
             const ProxyLoader = class extends Hls.DefaultConfig.loader {
                 load(context, config, callbacks) {
                     let url = context.url;
 
-                    // Durum 1: Segment http:// ile başlıyor → proxy'ye gönder
+                    // Durum 1: http:// URL → backend proxy üzerinden geçir
                     if (url.startsWith('http://')) {
-                        url = `${CF_WORKER}/http/${url.substring(7)}`;
-                        console.log('[HLS Proxy] http:// segment proxied:', url);
-                    }
-                    // Durum 2: URL worker domain'indedir ama /http/ veya /https/ prefiksi yok.
-                    // m3u8 içindeki root-relative path'ler (/hls/.../seg.ts gibi) HLS.js tarafından
-                    // worker domain'ine relative çözümlenir ve /http/ prefiksi düşer.
-                    else if (originalHost
-                             && url.startsWith(CF_WORKER + '/')
-                             && !url.startsWith(CF_WORKER + '/http/')
-                             && !url.startsWith(CF_WORKER + '/https/')) {
-                        const relativePath = url.substring(CF_WORKER.length);
-                        url = `${CF_WORKER}/http/${originalHost}${relativePath}`;
-                        console.log('[HLS Proxy] Root-relative segment fixed:', url);
+                        url = `${BACKEND_PROXY}?url=${encodeURIComponent(url)}`;
+                        console.log('[HLS Proxy] http:// → backend proxy:', url);
                     }
 
                     context.url = url;
@@ -1200,7 +1195,9 @@ export async function renderPlayer(channelId) {
                 lowLatencyMode: false,
                 loader: ProxyLoader,
             });
-            hls.loadSource(playUrl);
+            // rawUrl kullan: HLS.js relative segment path'lerini orijinal sunucuya göre çözer.
+            // ProxyLoader tüm http:// isteklerini backend proxy'ye yönlendirir.
+            hls.loadSource(rawUrl);
             hls.attachMedia(video);
 
 
@@ -1254,44 +1251,18 @@ export async function renderPlayer(channelId) {
             hls.on(Hls.Events.ERROR, function(event, data) {
                 console.warn('[HLS.js Hata/Uyarı]', data);
                 
-                // Eğer HLS segmentlerinde 403 Forbidden veya fatal hata alınırsa direct TS/mpegts moduna otomatik geç
-                if ((data.fatal || data.response?.code === 403) && !hlsFallbackTried) {
+                // Fatal hata alınırsa backend stream proxy ile doğrudan video.src dene
+                if (data.fatal && !hlsFallbackTried) {
                     hlsFallbackTried = true;
-                    console.log('[HLS Fallback] HLS hatası / 403 alındı, direct TS mpegts moduna geçiliyor...');
+                    console.log('[HLS Fallback] Fatal hata, backend stream proxy deneniyor...');
                     try { hls.destroy(); } catch(e){}
                     hls = null;
 
-                    let tsRawUrl = rawUrl.replace(/\.m3u8($|\?)/, '.ts$1');
-                    if (!tsRawUrl.endsWith('.ts') && !tsRawUrl.includes('.ts?')) {
-                        tsRawUrl = tsRawUrl.replace(/\/hls\//, '/live/');
-                    }
-                    let tsPlayUrl = tsRawUrl;
-                    if (tsRawUrl.startsWith('http://')) {
-                        tsPlayUrl = `https://webiptv.se-gokhankuru.workers.dev/http/${tsRawUrl.substring(7)}`;
-                    }
-
-                    loadMpegts().then(mpegts => {
-                        if (mpegts.getFeatureList().mseLivePlayback) {
-                            mpegtsPlayer = mpegts.createPlayer({
-                                type: 'mpegts',
-                                isLive: true,
-                                url: tsPlayUrl
-                            }, {
-                                enableWorker: true,
-                                enableStashBuffer: false,
-                                liveBufferLatencyChasing: true
-                            });
-                            mpegtsPlayer.attachMediaElement(video);
-                            mpegtsPlayer.load();
-                            mpegtsPlayer.play().catch(() => { playPauseBtn.innerHTML = icons.play; });
-                        } else {
-                            video.src = tsPlayUrl;
-                            video.play().catch(() => { playPauseBtn.innerHTML = icons.play; });
-                        }
-                    }).catch(() => {
-                        video.src = tsPlayUrl;
-                        video.play().catch(() => { playPauseBtn.innerHTML = icons.play; });
-                    });
+                    // Backend proxy üzerinden doğrudan stream
+                    const fbUrl = `/api/proxy/stream?url=${encodeURIComponent(rawUrl)}`;
+                    console.log('[HLS Fallback] Proxy URL:', fbUrl);
+                    video.src = fbUrl;
+                    safePlay();
                     return;
                 }
 
