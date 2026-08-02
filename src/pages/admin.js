@@ -2,7 +2,7 @@ import { apiClient } from '../services/api-client.js';
 
 export async function renderAdmin() {
     const container = document.getElementById('app');
-    
+
     // Check if user is admin
     if (!apiClient.store.user || apiClient.store.user.role !== 'admin') {
         window.location.hash = '#/home';
@@ -39,12 +39,12 @@ export async function renderAdmin() {
             e.target.style.background = 'var(--surface-hover)';
             e.target.style.color = 'white';
             e.target.classList.add('active');
-            
+
             loadTab(e.target.dataset.tab);
         });
     });
 
-    // Load initial tab
+    // Load initial tab asdasd
     loadTab('dashboard');
 }
 
@@ -91,14 +91,14 @@ async function loadTab(tab) {
                     </div>
                 </div>
             `;
-        } 
+        }
         else if (tab === 'users') {
             const users = await apiClient.request('/admin/users');
             let rows = '';
             users.forEach(u => {
                 const date = new Date(u.created_at).toLocaleDateString();
                 const lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : 'Hiç girmedi';
-                const statusBadge = u.is_active 
+                const statusBadge = u.is_active
                     ? '<span style="background: rgba(76, 175, 80, 0.2); color: #4CAF50; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">Aktif</span>'
                     : '<span style="background: rgba(244, 67, 54, 0.2); color: #F44336; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">Banlı</span>';
                 const roleBadge = u.role === 'admin'
@@ -157,7 +157,7 @@ async function loadTab(tab) {
                 </div>
             `;
         }
-    } catch(err) {
+    } catch (err) {
         content.innerHTML = `
             <div style="background: rgba(244, 67, 54, 0.1); border: 1px solid #F44336; padding: 20px; border-radius: 8px; color: #F44336;">
                 <strong>Hata:</strong> ${err.message}
@@ -169,7 +169,7 @@ async function loadTab(tab) {
 // Global action handler for user toggle
 window.toggleUserStatus = async (id, newStatus) => {
     if (!confirm(newStatus ? 'Bu kullanıcının banını kaldırmak istediğinize emin misiniz?' : 'Bu kullanıcıyı banlamak istediğinize emin misiniz?')) return;
-    
+
     try {
         await apiClient.request(`/admin/users/${id}`, {
             method: 'PUT',
@@ -178,7 +178,7 @@ window.toggleUserStatus = async (id, newStatus) => {
         // Reload users tab directly by finding the active button
         const activeBtn = document.querySelector('.admin-nav-btn.active');
         if (activeBtn) loadTab(activeBtn.dataset.tab);
-    } catch(e) {
+    } catch (e) {
         alert('İşlem başarısız: ' + e.message);
     }
 };
@@ -214,7 +214,7 @@ window.editUser = (id, username, email, role, isActive) => {
             </div>
         </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 };
 
@@ -222,7 +222,7 @@ window.saveUserEdit = async (id, isActive) => {
     const username = document.getElementById('edit-username').value;
     const email = document.getElementById('edit-email').value;
     const role = document.getElementById('edit-role').value;
-    
+
     if (!username || !email) return alert('Kullanıcı adı ve e-posta boş bırakılamaz!');
 
     try {
@@ -233,7 +233,7 @@ window.saveUserEdit = async (id, isActive) => {
         document.getElementById('edit-user-modal').remove();
         const activeBtn = document.querySelector('.admin-nav-btn.active');
         if (activeBtn) loadTab(activeBtn.dataset.tab);
-    } catch(e) {
+    } catch (e) {
         alert('Kaydetme hatası: ' + e.message);
     }
 };
